@@ -471,7 +471,8 @@ export class WordCounter {
       const data = isJson ? JSON.parse(documentText) : YAML.parse(documentText);
 
       let count = 0;
-      const countBodies = (obj: Record<string, unknown>): void => {
+      const countBodies = (obj: Record<string, unknown>, depth: number = 0): void => {
+        if (depth > MAX_RECURSION_DEPTH) { return; }
         if (obj && typeof obj === 'object') {
           if ('body' in obj && obj.body) {
             count++;
@@ -479,7 +480,7 @@ export class WordCounter {
           if ('children' in obj && Array.isArray(obj.children)) {
             for (const child of obj.children) {
               if (child && typeof child === 'object') {
-                countBodies(child as Record<string, unknown>);
+                countBodies(child as Record<string, unknown>, depth + 1);
               }
             }
           }
@@ -501,7 +502,8 @@ export class WordCounter {
       const isJson = documentText.trim().startsWith('{');
       const data = isJson ? JSON.parse(documentText) : YAML.parse(documentText);
 
-      const checkIncludes = (obj: Record<string, unknown>): boolean => {
+      const checkIncludes = (obj: Record<string, unknown>, depth: number = 0): boolean => {
+        if (depth > MAX_RECURSION_DEPTH) { return false; }
         if (obj && typeof obj === 'object') {
           if ('include' in obj) {
             return true;
@@ -509,7 +511,7 @@ export class WordCounter {
           if ('children' in obj && Array.isArray(obj.children)) {
             for (const child of obj.children) {
               if (child && typeof child === 'object') {
-                if (checkIncludes(child as Record<string, unknown>)) {
+                if (checkIncludes(child as Record<string, unknown>, depth + 1)) {
                   return true;
                 }
               }
@@ -669,67 +671,4 @@ export async function runUpdateWordCount(): Promise<void> {
 export function disposeWordCount(): void {
   outputChannel?.dispose();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
