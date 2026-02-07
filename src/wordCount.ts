@@ -183,7 +183,7 @@ export class WordCounter {
     try {
       await fsPromises.access(filePath);
     } catch {
-      this.errors.push(`Include file not found: ${filePath}`);
+      this.errors.push(`Include file not found: ${path.basename(filePath)}`);
       return;
     }
 
@@ -204,7 +204,7 @@ export class WordCounter {
       if (isMarkdownFile(filePath)) {
         return;
       }
-      this.errors.push(`Include is not a valid codex file: ${filePath}`);
+      this.errors.push(`Include is not a valid codex file: ${path.basename(filePath)}`);
       return;
     }
 
@@ -229,7 +229,7 @@ export class WordCounter {
         console.log(`[WordCount] Updated included file: ${filePath}`);
       }
     } catch (e) {
-      this.errors.push(`Failed to process include "${filePath}": ${e}`);
+      this.errors.push(`Failed to process include "${path.basename(filePath)}"`);
     }
   }
 
@@ -344,7 +344,7 @@ export class WordCounter {
 
       return true;
     } catch (e) {
-      this.errors.push(`Failed to update markdown file "${filePath}": ${e}`);
+      this.errors.push(`Failed to update markdown file "${path.basename(filePath)}"`);
       return false;
     }
   }
@@ -375,7 +375,7 @@ export class WordCounter {
       try {
         await fsPromises.access(inputPath);
       } catch {
-        throw new Error(`Input file not found: ${inputPath}`);
+        throw new Error(`Input file not found: ${path.basename(inputPath)}`);
       }
 
       // Mark this file as processed
