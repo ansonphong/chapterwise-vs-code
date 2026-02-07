@@ -13,6 +13,8 @@ import * as fs from 'fs';
 import * as YAML from 'yaml';
 import { isCodexFile, isCodexLikeFile, isMarkdownFile } from './codexModel';
 
+const MAX_RECURSION_DEPTH = 50;
+
 /**
  * Options for word count operation
  */
@@ -91,8 +93,14 @@ export class WordCounter {
   private updateWordCountInObject(
     obj: Record<string, unknown>,
     parentDir: string,
-    options: WordCountOptions
+    options: WordCountOptions,
+    depth: number = 0
   ): boolean {
+    if (depth > MAX_RECURSION_DEPTH) {
+      this.errors.push(`Maximum recursion depth (${MAX_RECURSION_DEPTH}) exceeded — skipping deeper children`);
+      return false;
+    }
+
     let wasModified = false;
 
     // Check if this object has a body field
@@ -151,7 +159,8 @@ export class WordCounter {
             const childModified = this.updateWordCountInObject(
               child as Record<string, unknown>,
               parentDir,
-              options
+              options,
+              depth + 1
             );
             wasModified = wasModified || childModified;
           }
@@ -232,7 +241,8 @@ export class WordCounter {
       const doc = new YAML.Document(data);
 
       // Set block scalar style for long/multiline strings
-      const setBlockStyle = (node: unknown): void => {
+      const setBlockStyle = (node: unknown, depth: number = 0): void => {
+        if (depth > MAX_RECURSION_DEPTH) { return; }
         if (YAML.isMap(node)) {
           for (const pair of node.items) {
             if (YAML.isScalar(pair.value) && typeof pair.value.value === 'string') {
@@ -241,12 +251,12 @@ export class WordCounter {
                 pair.value.type = YAML.Scalar.BLOCK_LITERAL;
               }
             } else {
-              setBlockStyle(pair.value);
+              setBlockStyle(pair.value, depth + 1);
             }
           }
         } else if (YAML.isSeq(node)) {
           for (const item of node.items) {
-            setBlockStyle(item);
+            setBlockStyle(item, depth + 1);
           }
         }
       };
