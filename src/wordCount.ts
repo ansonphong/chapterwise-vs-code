@@ -40,6 +40,7 @@ export class WordCounter {
   private filesModified: string[] = [];
   private errors: string[] = [];
   private processedFiles: Set<string> = new Set();
+  private workspaceRoot: string = '';
 
   /**
    * Count words in a text string (split on whitespace)
@@ -49,6 +50,15 @@ export class WordCounter {
       return 0;
     }
     return text.split(/\s+/).filter(w => w.length > 0).length;
+  }
+
+  /**
+   * Check if a resolved path is within the workspace root
+   */
+  private isPathWithinRoot(resolvedPath: string): boolean {
+    const normalizedResolved = path.resolve(resolvedPath);
+    const normalizedRoot = path.resolve(this.workspaceRoot);
+    return normalizedResolved.startsWith(normalizedRoot + path.sep) || normalizedResolved === normalizedRoot;
   }
 
   /**
@@ -124,6 +134,12 @@ export class WordCounter {
               fullPath = path.join(parentDir, includePath);
             } else {
               fullPath = path.resolve(parentDir, includePath);
+            }
+
+            // Validate path stays within workspace
+            if (!this.isPathWithinRoot(fullPath)) {
+              this.errors.push(`Include path escapes workspace boundary: ${path.basename(fullPath)}`);
+              continue;
             }
 
             // Process the included file if not already processed
@@ -323,6 +339,13 @@ export class WordCounter {
 
     try {
       const inputPath = documentUri.fsPath;
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (workspaceFolders) {
+        this.workspaceRoot = workspaceFolders[0].uri.fsPath;
+      } else {
+        this.workspaceRoot = path.dirname(inputPath);
+      }
+
       if (!fs.existsSync(inputPath)) {
         throw new Error(`Input file not found: ${inputPath}`);
       }
