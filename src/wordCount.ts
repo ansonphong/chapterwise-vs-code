@@ -10,6 +10,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+const fsPromises = fs.promises;
 import * as YAML from 'yaml';
 import { isCodexFile, isCodexLikeFile, isMarkdownFile } from './codexModel';
 
@@ -90,12 +91,12 @@ export class WordCounter {
   /**
    * Update word count in an object and its children recursively
    */
-  private updateWordCountInObject(
+  private async updateWordCountInObject(
     obj: Record<string, unknown>,
     parentDir: string,
     options: WordCountOptions,
     depth: number = 0
-  ): boolean {
+  ): Promise<boolean> {
     if (depth > MAX_RECURSION_DEPTH) {
       this.errors.push(`Maximum recursion depth (${MAX_RECURSION_DEPTH}) exceeded — skipping deeper children`);
       return false;
@@ -152,11 +153,11 @@ export class WordCounter {
 
             // Process the included file if not already processed
             if (!this.processedFiles.has(fullPath)) {
-              this.processIncludedFile(fullPath, options);
+              await this.processIncludedFile(fullPath, options);
             }
           } else {
             // Regular child - recurse
-            const childModified = this.updateWordCountInObject(
+            const childModified = await this.updateWordCountInObject(
               child as Record<string, unknown>,
               parentDir,
               options,
@@ -174,18 +175,21 @@ export class WordCounter {
   /**
    * Process an included file
    */
-  private processIncludedFile(filePath: string, options: WordCountOptions): void {
+  private async processIncludedFile(filePath: string, options: WordCountOptions): Promise<void> {
     // Mark as processed to avoid infinite loops
     this.processedFiles.add(filePath);
 
-    if (!fs.existsSync(filePath)) {
+    // Check file exists
+    try {
+      await fsPromises.access(filePath);
+    } catch {
       this.errors.push(`Include file not found: ${filePath}`);
       return;
     }
 
     // Reject symlinks
     try {
-      const stat = fs.lstatSync(filePath);
+      const stat = await fsPromises.lstat(filePath);
       if (stat.isSymbolicLink()) {
         this.errors.push(`Skipping symlink include: ${path.basename(filePath)}`);
         return;
@@ -205,7 +209,7 @@ export class WordCounter {
     }
 
     try {
-      const content = fs.readFileSync(filePath, 'utf-8');
+      const content = await fsPromises.readFile(filePath, 'utf-8');
       const isJson = filePath.toLowerCase().endsWith('.json');
 
       let data: Record<string, unknown>;
@@ -216,11 +220,11 @@ export class WordCounter {
       }
 
       const parentDir = path.dirname(filePath);
-      const wasModified = this.updateWordCountInObject(data, parentDir, options);
+      const wasModified = await this.updateWordCountInObject(data, parentDir, options);
 
       if (wasModified) {
         // Save the file
-        this.writeCodexFile(filePath, data, isJson ? 'json' : 'yaml');
+        await this.writeCodexFile(filePath, data, isJson ? 'json' : 'yaml');
         this.filesModified.push(filePath);
         console.log(`[WordCount] Updated included file: ${filePath}`);
       }
@@ -232,11 +236,11 @@ export class WordCounter {
   /**
    * Write codex data to file with proper formatting
    */
-  private writeCodexFile(
+  private async writeCodexFile(
     filePath: string,
     data: Record<string, unknown>,
     format: 'yaml' | 'json'
-  ): void {
+  ): Promise<void> {
     if (format === 'yaml') {
       const doc = new YAML.Document(data);
 
@@ -263,9 +267,9 @@ export class WordCounter {
 
       setBlockStyle(doc.contents);
 
-      fs.writeFileSync(filePath, doc.toString({ lineWidth: 120 }), 'utf-8');
+      await fsPromises.writeFile(filePath, doc.toString({ lineWidth: 120 }), 'utf-8');
     } else {
-      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+      await fsPromises.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
     }
   }
 
@@ -315,9 +319,9 @@ export class WordCounter {
   /**
    * Update word count in a markdown file
    */
-  private updateWordCountInMarkdown(filePath: string): boolean {
+  private async updateWordCountInMarkdown(filePath: string): Promise<boolean> {
     try {
-      const content = fs.readFileSync(filePath, 'utf-8');
+      const content = await fsPromises.readFile(filePath, 'utf-8');
       const { frontmatter, body } = this.extractFrontmatter(content);
 
       // Count words in body
@@ -336,7 +340,7 @@ export class WordCounter {
 
       // Write back to file
       const newContent = this.serializeMarkdown(frontmatter, body);
-      fs.writeFileSync(filePath, newContent, 'utf-8');
+      await fsPromises.writeFile(filePath, newContent, 'utf-8');
 
       return true;
     } catch (e) {
@@ -368,7 +372,9 @@ export class WordCounter {
         this.workspaceRoot = path.dirname(inputPath);
       }
 
-      if (!fs.existsSync(inputPath)) {
+      try {
+        await fsPromises.access(inputPath);
+      } catch {
         throw new Error(`Input file not found: ${inputPath}`);
       }
 
@@ -378,7 +384,7 @@ export class WordCounter {
       // Check if this is a markdown file
       if (isMarkdownFile(inputPath)) {
         // Handle Codex Lite (Markdown) format
-        const wasModified = this.updateWordCountInMarkdown(inputPath);
+        const wasModified = await this.updateWordCountInMarkdown(inputPath);
 
         if (wasModified) {
           this.filesModified.push(inputPath);
@@ -394,7 +400,7 @@ export class WordCounter {
       }
 
       // Handle full Codex format files
-      const fileContent = fs.readFileSync(inputPath, 'utf-8');
+      const fileContent = await fsPromises.readFile(inputPath, 'utf-8');
       const isJson = inputPath.toLowerCase().endsWith('.json');
 
       let codexData: Record<string, unknown>;
@@ -412,11 +418,11 @@ export class WordCounter {
       const parentDir = path.dirname(inputPath);
 
       // Update word counts recursively
-      const wasModified = this.updateWordCountInObject(codexData, parentDir, options);
+      const wasModified = await this.updateWordCountInObject(codexData, parentDir, options);
 
       if (wasModified) {
         // Save the main file
-        this.writeCodexFile(inputPath, codexData, isJson ? 'json' : 'yaml');
+        await this.writeCodexFile(inputPath, codexData, isJson ? 'json' : 'yaml');
         this.filesModified.push(inputPath);
       }
 
