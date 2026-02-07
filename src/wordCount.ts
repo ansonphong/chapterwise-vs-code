@@ -241,35 +241,45 @@ export class WordCounter {
     data: Record<string, unknown>,
     format: 'yaml' | 'json'
   ): Promise<void> {
-    if (format === 'yaml') {
-      const doc = new YAML.Document(data);
+    const tmpPath = filePath + '.tmp';
+    try {
+      let content: string;
+      if (format === 'yaml') {
+        const doc = new YAML.Document(data);
 
-      // Set block scalar style for long/multiline strings
-      const setBlockStyle = (node: unknown, depth: number = 0): void => {
-        if (depth > MAX_RECURSION_DEPTH) { return; }
-        if (YAML.isMap(node)) {
-          for (const pair of node.items) {
-            if (YAML.isScalar(pair.value) && typeof pair.value.value === 'string') {
-              const str = pair.value.value;
-              if (str.includes('\n') || str.length > 80) {
-                pair.value.type = YAML.Scalar.BLOCK_LITERAL;
+        // Set block scalar style for long/multiline strings
+        const setBlockStyle = (node: unknown, depth: number = 0): void => {
+          if (depth > MAX_RECURSION_DEPTH) { return; }
+          if (YAML.isMap(node)) {
+            for (const pair of node.items) {
+              if (YAML.isScalar(pair.value) && typeof pair.value.value === 'string') {
+                const str = pair.value.value;
+                if (str.includes('\n') || str.length > 80) {
+                  pair.value.type = YAML.Scalar.BLOCK_LITERAL;
+                }
+              } else {
+                setBlockStyle(pair.value, depth + 1);
               }
-            } else {
-              setBlockStyle(pair.value, depth + 1);
+            }
+          } else if (YAML.isSeq(node)) {
+            for (const item of node.items) {
+              setBlockStyle(item, depth + 1);
             }
           }
-        } else if (YAML.isSeq(node)) {
-          for (const item of node.items) {
-            setBlockStyle(item, depth + 1);
-          }
-        }
-      };
+        };
 
-      setBlockStyle(doc.contents);
+        setBlockStyle(doc.contents);
 
-      await fsPromises.writeFile(filePath, doc.toString({ lineWidth: 120 }), 'utf-8');
-    } else {
-      await fsPromises.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+        content = doc.toString({ lineWidth: 120 });
+      } else {
+        content = JSON.stringify(data, null, 2);
+      }
+      await fsPromises.writeFile(tmpPath, content, 'utf-8');
+      await fsPromises.rename(tmpPath, filePath);
+    } catch (e) {
+      // Clean up temp file on failure
+      try { await fsPromises.unlink(tmpPath); } catch { /* ignore */ }
+      throw e;
     }
   }
 
@@ -338,9 +348,16 @@ export class WordCounter {
       frontmatter.word_count = wordCount;
       this.entitiesUpdated++;
 
-      // Write back to file
+      // Write back to file atomically
       const newContent = this.serializeMarkdown(frontmatter, body);
-      await fsPromises.writeFile(filePath, newContent, 'utf-8');
+      const tmpPath = filePath + '.tmp';
+      try {
+        await fsPromises.writeFile(tmpPath, newContent, 'utf-8');
+        await fsPromises.rename(tmpPath, filePath);
+      } catch (e) {
+        try { await fsPromises.unlink(tmpPath); } catch { /* ignore */ }
+        throw e;
+      }
 
       return true;
     } catch (e) {
