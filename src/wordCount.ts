@@ -174,6 +174,18 @@ export class WordCounter {
       return;
     }
 
+    // Reject symlinks
+    try {
+      const stat = fs.lstatSync(filePath);
+      if (stat.isSymbolicLink()) {
+        this.errors.push(`Skipping symlink include: ${path.basename(filePath)}`);
+        return;
+      }
+    } catch {
+      this.errors.push(`Cannot stat include file: ${path.basename(filePath)}`);
+      return;
+    }
+
     if (!isCodexFile(filePath)) {
       // Skip markdown files in includes for now
       if (isMarkdownFile(filePath)) {
