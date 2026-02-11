@@ -152,3 +152,24 @@ describe('getEffectiveColor', () => {
     expect(cm.getEffectiveColor(makeNode(), makeSettings())).toEqual({ color: null, inherited: false });
   });
 });
+
+describe('updateNodeColor - save failures', () => {
+  let cm: ColorManager;
+  beforeEach(() => { cm = new ColorManager(); vi.clearAllMocks(); });
+
+  it('returns false when applyEdit fails', async () => {
+    const node = makeNode({ path: [] });
+    const doc = { getText: () => 'id: test\ntype: chapter\nname: T', uri: { fsPath: '/t.yaml' }, lineCount: 3, save: vi.fn() } as any;
+    const vscode = await import('vscode');
+    vi.mocked(vscode.workspace.applyEdit).mockResolvedValue(false);
+    expect(await cm.updateNodeColor(node, doc, '#EF4444')).toBe(false);
+  });
+
+  it('returns false when save throws', async () => {
+    const node = makeNode({ path: [] });
+    const doc = { getText: () => 'id: test\ntype: chapter\nname: T', uri: { fsPath: '/t.yaml' }, lineCount: 3, save: vi.fn().mockRejectedValue(new Error('read-only')) } as any;
+    const vscode = await import('vscode');
+    vi.mocked(vscode.workspace.applyEdit).mockResolvedValue(true);
+    expect(await cm.updateNodeColor(node, doc, '#EF4444')).toBe(false);
+  });
+});

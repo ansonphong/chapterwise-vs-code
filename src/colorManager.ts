@@ -251,7 +251,11 @@ export class ColorManager {
         newText
       );
       
-      await vscode.workspace.applyEdit(edit);
+      const editApplied = await vscode.workspace.applyEdit(edit);
+      if (!editApplied) {
+        vscode.window.showErrorMessage('Failed to apply color edit to document');
+        return false;
+      }
       await document.save();
       
       vscode.window.setStatusBarMessage(
