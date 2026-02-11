@@ -85,13 +85,13 @@ export class ColorManager {
     }
     
     // Walk up parent chain to find inherited color
-    let current = (node as any).parent as CodexNode | undefined;
+    let current = node.parent;
     while (current) {
       const parentColor = this.getNodeColor(current);
       if (parentColor) {
         return { color: parentColor, inherited: true };
       }
-      current = (current as any).parent;
+      current = current.parent;
     }
     
     // Check default color for type

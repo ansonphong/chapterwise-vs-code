@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ColorManager } from './colorManager';
 import type { CodexNode } from './codexModel';
+import type { NavigatorSettings } from './settingsManager';
 
 function makeNode(overrides: Partial<CodexNode> = {}): CodexNode {
   return {
@@ -105,5 +106,49 @@ describe('buildYamlPath', () => {
   it('handles deep path', () => {
     const input = ['children', 0, 'children', 2, 'children', 5];
     expect((cm as any).buildYamlPath(input)).toEqual(input);
+  });
+});
+
+function makeSettings(colorOverrides: Partial<NavigatorSettings['colors']> = {}): NavigatorSettings {
+  return {
+    defaultChildMode: 'ask',
+    fileOrganization: { strategy: 'organized', dataFolderPath: 'Files/Data', useUuidFilenames: false },
+    naming: { slugify: true, preserveCase: false, separator: '-', includeType: false, includeParent: false },
+    includes: { preferRelative: true, format: 'string' },
+    automation: { autoGenerateIds: true, autoGenerateIndex: true, autoSort: false, autoSave: true },
+    safety: { confirmDelete: true, confirmMove: false, validateOnSave: true, backupBeforeDestruct: true },
+    colors: { inheritFromParent: false, showInheritedDimmed: true, defaultColors: {}, ...colorOverrides },
+  };
+}
+
+describe('getEffectiveColor', () => {
+  let cm: ColorManager;
+  beforeEach(() => { cm = new ColorManager(); });
+
+  it('returns own color', () => {
+    const node = makeNode({ attributes: [{ key: 'color', value: '#EF4444' }], hasAttributes: true });
+    expect(cm.getEffectiveColor(node, makeSettings())).toEqual({ color: '#EF4444', inherited: false });
+  });
+
+  it('inherits from parent', () => {
+    const parent = makeNode({ attributes: [{ key: 'color', value: '#10B981' }], hasAttributes: true });
+    const child = makeNode({ parent });
+    expect(cm.getEffectiveColor(child, makeSettings({ inheritFromParent: true }))).toEqual({ color: '#10B981', inherited: true });
+  });
+
+  it('inherits from grandparent', () => {
+    const gp = makeNode({ attributes: [{ key: 'color', value: '#3B82F6' }], hasAttributes: true });
+    const parent = makeNode({ parent: gp });
+    const child = makeNode({ parent });
+    expect(cm.getEffectiveColor(child, makeSettings({ inheritFromParent: true }))).toEqual({ color: '#3B82F6', inherited: true });
+  });
+
+  it('returns default color for type (when inheritance enabled)', () => {
+    const node = makeNode({ type: 'chapter' });
+    expect(cm.getEffectiveColor(node, makeSettings({ inheritFromParent: true, defaultColors: { chapter: '#3B82F6' } }))).toEqual({ color: '#3B82F6', inherited: false });
+  });
+
+  it('returns null when nothing matches', () => {
+    expect(cm.getEffectiveColor(makeNode(), makeSettings())).toEqual({ color: null, inherited: false });
   });
 });
