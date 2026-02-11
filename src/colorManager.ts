@@ -117,18 +117,20 @@ export class ColorManager {
     document: vscode.TextDocument
   ): Promise<boolean> {
     // Show quick pick with color presets
-    const items = this.COLOR_PRESETS.map(preset => ({
+    const items: Array<{
+      label: string; description: string; detail: string; preset: ColorPreset | null;
+    }> = this.COLOR_PRESETS.map(preset => ({
       label: `${preset.emoji} ${preset.name}`,
       description: preset.description,
       detail: preset.hex || 'Remove color',
       preset: preset
     }));
-    
+
     items.push({
       label: '$(symbol-color) Custom Color...',
       description: 'Enter custom hex color',
       detail: '#RRGGBB',
-      preset: null as any
+      preset: null
     });
     
     const selected = await vscode.window.showQuickPick(items, {
@@ -375,9 +377,11 @@ export class ColorManager {
   }
   
   /**
-   * Convert hex color to VS Code theme color name
-   * Note: VS Code doesn't support arbitrary colors in ThemeIcon,
-   * so this is a placeholder for potential future support
+   * Convert hex color to VS Code theme color name.
+   *
+   * VS Code ThemeIcon only supports named theme colors, not arbitrary hex.
+   * Known preset hex values map to semantically similar theme colors.
+   * Custom/unknown hex colors fall back to 'foreground' (default text color).
    */
   private hexToThemeColor(hex: string): string {
     // Map common hex colors to VS Code theme color names
