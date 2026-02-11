@@ -80,7 +80,7 @@ export class ColorManager {
     }
     
     // Check inheritance setting
-    if (!settings.colors.inheritFromParent) {
+    if (!settings.colors?.inheritFromParent) {
       return { color: null, inherited: false };
     }
     
@@ -95,7 +95,7 @@ export class ColorManager {
     }
     
     // Check default color for type
-    if (node.type && settings.colors.defaultColors[node.type]) {
+    if (node.type && settings.colors?.defaultColors?.[node.type]) {
       return { 
         color: settings.colors.defaultColors[node.type], 
         inherited: false 

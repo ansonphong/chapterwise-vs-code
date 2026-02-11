@@ -173,3 +173,13 @@ describe('updateNodeColor - save failures', () => {
     expect(await cm.updateNodeColor(node, doc, '#EF4444')).toBe(false);
   });
 });
+
+describe('getEffectiveColor - null guards', () => {
+  let cm: ColorManager;
+  beforeEach(() => { cm = new ColorManager(); });
+
+  it('handles undefined colors section', () => {
+    const settings = { ...makeSettings(), colors: undefined } as unknown as NavigatorSettings;
+    expect(cm.getEffectiveColor(makeNode(), settings)).toEqual({ color: null, inherited: false });
+  });
+});
