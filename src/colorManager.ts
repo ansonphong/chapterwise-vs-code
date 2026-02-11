@@ -5,7 +5,7 @@
 
 import * as vscode from 'vscode';
 import * as YAML from 'yaml';
-import { CodexNode } from './codexModel';
+import { CodexNode, PathSegment } from './codexModel';
 import { NavigatorSettings } from './settingsManager';
 
 /**
@@ -362,18 +362,12 @@ export class ColorManager {
   // ============ PRIVATE HELPER METHODS ============
   
   /**
-   * Build YAML path from PathSegment array
+   * Build YAML path from PathSegment array.
+   * node.path already contains 'children' segments from codexModel parsing,
+   * so this is a simple pass-through (matching codexModel.setNodeProse pattern).
    */
-  private buildYamlPath(pathSegments: any[]): any[] {
-    const yamlPath: any[] = [];
-    for (const segment of pathSegments) {
-      if (typeof segment === 'number') {
-        yamlPath.push(segment);
-      } else {
-        yamlPath.push('children', segment);
-      }
-    }
-    return yamlPath;
+  private buildYamlPath(pathSegments: PathSegment[]): (string | number)[] {
+    return pathSegments.map(p => typeof p === 'number' ? p : String(p));
   }
   
   /**

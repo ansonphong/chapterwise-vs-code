@@ -84,3 +84,26 @@ describe('updateNodeColor', () => {
     expect(await cm.updateNodeColor(node, doc, '#3B82F6')).toBe(true);
   });
 });
+
+describe('buildYamlPath', () => {
+  let cm: ColorManager;
+  beforeEach(() => { cm = new ColorManager(); });
+
+  it('does not double-wrap children segments', () => {
+    const result = (cm as any).buildYamlPath(['children', 0, 'children', 1]);
+    expect(result).toEqual(['children', 0, 'children', 1]);
+  });
+
+  it('handles empty path (root node)', () => {
+    expect((cm as any).buildYamlPath([])).toEqual([]);
+  });
+
+  it('handles single-level path', () => {
+    expect((cm as any).buildYamlPath(['children', 0])).toEqual(['children', 0]);
+  });
+
+  it('handles deep path', () => {
+    const input = ['children', 0, 'children', 2, 'children', 5];
+    expect((cm as any).buildYamlPath(input)).toEqual(input);
+  });
+});
