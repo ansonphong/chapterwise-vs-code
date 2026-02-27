@@ -1959,6 +1959,551 @@ function registerCommands(context: vscode.ExtensionContext): void {
     )
   );
 
+  // === Stage 6: New Command Handlers ===
+
+  // Add field to node
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.addField', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const fieldName = await vscode.window.showInputBox({ prompt: 'Enter field name', placeHolder: 'e.g., synopsis, notes' });
+      if (!fieldName) return;
+      const { getStructureEditor } = await import('./structureEditor');
+      const editor = getStructureEditor();
+      if (treeItem instanceof CodexTreeItem) {
+        const doc = await vscode.workspace.openTextDocument(treeItem.documentUri);
+        await editor.addFieldToNode(doc, treeItem.codexNode, fieldName);
+      } else if (treeItem instanceof IndexNodeTreeItem) {
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
+        const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+        if (resolved) await editor.addFieldToNode(resolved.doc, resolved.node, fieldName);
+      }
+      await reloadTreeIndex();
+    })
+  );
+
+  // Delete field from node
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.deleteField', async (treeItem?: CodexFieldTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const { getStructureEditor } = await import('./structureEditor');
+      const editor = getStructureEditor();
+      if (treeItem instanceof CodexFieldTreeItem) {
+        const doc = await vscode.workspace.openTextDocument(treeItem.documentUri);
+        await editor.removeFieldFromNode(doc, treeItem.parentNode, treeItem.fieldName);
+      } else if (treeItem instanceof IndexNodeTreeItem) {
+        const fieldName = (treeItem.indexNode as any)._field_name;
+        if (!fieldName) return;
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
+        const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+        if (resolved) await editor.removeFieldFromNode(resolved.doc, resolved.node, fieldName);
+      }
+      await reloadTreeIndex();
+    })
+  );
+
+  // Rename field on node
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.renameField', async (treeItem?: CodexFieldTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      let oldName: string | undefined;
+      if (treeItem instanceof CodexFieldTreeItem) {
+        oldName = treeItem.fieldName;
+      } else if (treeItem instanceof IndexNodeTreeItem) {
+        oldName = (treeItem.indexNode as any)._field_name;
+      }
+      if (!oldName) return;
+      const newName = await vscode.window.showInputBox({ prompt: 'Enter new field name', value: oldName });
+      if (!newName || newName === oldName) return;
+      const { getStructureEditor } = await import('./structureEditor');
+      const editor = getStructureEditor();
+      if (treeItem instanceof CodexFieldTreeItem) {
+        const doc = await vscode.workspace.openTextDocument(treeItem.documentUri);
+        await editor.renameFieldOnNode(doc, treeItem.parentNode, oldName, newName);
+      } else if (treeItem instanceof IndexNodeTreeItem) {
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
+        const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+        if (resolved) await editor.renameFieldOnNode(resolved.doc, resolved.node, oldName, newName);
+      }
+      await reloadTreeIndex();
+    })
+  );
+
+  // Change node type
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.changeType', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const types = ['book', 'chapter', 'scene', 'character', 'location', 'item', 'event', 'note', 'world', 'faction', 'lore'];
+      const picked = await vscode.window.showQuickPick(types, { placeHolder: 'Select node type' });
+      if (!picked) return;
+      const { getStructureEditor } = await import('./structureEditor');
+      const editor = getStructureEditor();
+      if (treeItem instanceof CodexTreeItem) {
+        const doc = await vscode.workspace.openTextDocument(treeItem.documentUri);
+        await editor.changeNodeType(doc, treeItem.codexNode, picked);
+      } else if (treeItem instanceof IndexNodeTreeItem) {
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
+        const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+        if (resolved) await editor.changeNodeType(resolved.doc, resolved.node, picked);
+      }
+      await reloadTreeIndex();
+    })
+  );
+
+  // Change icon/emoji
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.changeIcon', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const emoji = await vscode.window.showInputBox({ prompt: 'Enter emoji', placeHolder: 'e.g., 📖 🗡️ 🏰' });
+      if (!emoji) return;
+      const { getStructureEditor } = await import('./structureEditor');
+      const editor = getStructureEditor();
+      if (treeItem instanceof CodexTreeItem) {
+        const doc = await vscode.workspace.openTextDocument(treeItem.documentUri);
+        await editor.setEmojiOnNode(doc, treeItem.codexNode, emoji);
+      } else if (treeItem instanceof IndexNodeTreeItem) {
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
+        const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+        if (resolved) await editor.setEmojiOnNode(resolved.doc, resolved.node, emoji);
+      }
+      await reloadTreeIndex();
+    })
+  );
+
+  // Add tags to node
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.addTags', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const input = await vscode.window.showInputBox({ prompt: 'Enter tags (comma-separated)', placeHolder: 'e.g., action, drama, mystery' });
+      if (!input) return;
+      const tags = input.split(',').map(t => t.trim()).filter(Boolean);
+      if (tags.length === 0) return;
+      const { getStructureEditor } = await import('./structureEditor');
+      const editor = getStructureEditor();
+      if (treeItem instanceof CodexTreeItem) {
+        const doc = await vscode.workspace.openTextDocument(treeItem.documentUri);
+        await editor.addTagsToNode(doc, treeItem.codexNode, tags);
+      } else if (treeItem instanceof IndexNodeTreeItem) {
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
+        const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+        if (resolved) await editor.addTagsToNode(resolved.doc, resolved.node, tags);
+      }
+      await reloadTreeIndex();
+    })
+  );
+
+  // Add relation to node
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.addRelation', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const targetId = await vscode.window.showInputBox({ prompt: 'Enter target node ID' });
+      if (!targetId) return;
+      const relTypes = ['follows', 'precedes', 'references', 'parent-of', 'child-of', 'related-to'];
+      const relType = await vscode.window.showQuickPick(relTypes, { placeHolder: 'Select relation type' });
+      if (!relType) return;
+      const { getStructureEditor } = await import('./structureEditor');
+      const editor = getStructureEditor();
+      if (treeItem instanceof CodexTreeItem) {
+        const doc = await vscode.workspace.openTextDocument(treeItem.documentUri);
+        await editor.addRelationToNode(doc, treeItem.codexNode, targetId, relType);
+      } else if (treeItem instanceof IndexNodeTreeItem) {
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
+        const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+        if (resolved) await editor.addRelationToNode(resolved.doc, resolved.node, targetId, relType);
+      }
+      await reloadTreeIndex();
+    })
+  );
+
+  // Copy path (index files/folders only)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.copyPath', async (treeItem?: IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const cp = treeItem.indexNode._computed_path;
+      if (!cp) return;
+      await vscode.env.clipboard.writeText(cp);
+      vscode.window.setStatusBarMessage(`Copied path: ${cp}`, 3000);
+    })
+  );
+
+  // Open in file explorer
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.openInFinder', async (treeItem?: IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const wsRoot = getWorkspaceRoot();
+      if (!wsRoot) return;
+      const cp = treeItem.indexNode._computed_path;
+      if (!cp) return;
+      const fullPath = path.join(wsRoot, cp);
+      await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(fullPath));
+    })
+  );
+
+  // Move to trash
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.moveToTrash', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      if (treeItem instanceof IndexNodeTreeItem) {
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
+        const nodeKind = (treeItem.indexNode as any)._node_kind;
+        if (nodeKind === 'file' || nodeKind === 'folder') {
+          const filePath = treeItem.indexNode._computed_path;
+          if (!filePath) return;
+          const { getStructureEditor } = await import('./structureEditor');
+          const { getSettingsManager } = await import('./settingsManager');
+          const editor = getStructureEditor();
+          const settings = await getSettingsManager().getSettings(vscode.Uri.file(path.join(wsRoot, filePath)));
+          await editor.removeFileFromIndex(wsRoot, filePath, false, settings);
+          await regenerateAndReload(wsRoot);
+          return;
+        } else if (nodeKind === 'node') {
+          const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+          if (!resolved) return;
+          const { getStructureEditor } = await import('./structureEditor');
+          const { getSettingsManager } = await import('./settingsManager');
+          const editor = getStructureEditor();
+          const settings = await getSettingsManager().getSettings(resolved.doc.uri);
+          await editor.removeNodeFromDocument(resolved.doc, resolved.node, false, settings);
+          await reloadTreeIndex();
+          return;
+        }
+      }
+      if (treeItem instanceof CodexTreeItem) {
+        const document = treeProvider.getActiveTextDocument();
+        if (!document) return;
+        const { getStructureEditor } = await import('./structureEditor');
+        const { getSettingsManager } = await import('./settingsManager');
+        const editor = getStructureEditor();
+        const settings = await getSettingsManager().getSettings(document.uri);
+        await editor.removeNodeFromDocument(document, treeItem.codexNode, false, settings);
+        treeProvider.setActiveDocument(document);
+      }
+    })
+  );
+
+  // Duplicate node
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.duplicateNode', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const { getStructureEditor } = await import('./structureEditor');
+      const editor = getStructureEditor();
+      if (treeItem instanceof CodexTreeItem) {
+        const doc = await vscode.workspace.openTextDocument(treeItem.documentUri);
+        await editor.duplicateNodeInDocument(doc, treeItem.codexNode);
+        treeProvider.setActiveDocument(doc);
+      } else if (treeItem instanceof IndexNodeTreeItem) {
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
+        const nodeKind = (treeItem.indexNode as any)._node_kind;
+        if (nodeKind === 'file') {
+          const filePath = treeItem.indexNode._computed_path;
+          if (!filePath) return;
+          const fullPath = path.join(wsRoot, filePath);
+          const ext = path.extname(filePath);
+          const base = filePath.slice(0, -ext.length);
+          const newPath = `${base}-copy${ext}`;
+          const newFullPath = path.join(wsRoot, newPath);
+          const fsPromises = (await import('fs/promises'));
+          await fsPromises.copyFile(fullPath, newFullPath);
+          await regenerateAndReload(wsRoot);
+        } else if (nodeKind === 'node') {
+          const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+          if (!resolved) return;
+          await editor.duplicateNodeInDocument(resolved.doc, resolved.node);
+          await reloadTreeIndex();
+        }
+      }
+    })
+  );
+
+  // Cut node (store in clipboard)
+  // ClipboardManager is lazily initialized on first cut
+  let clipboardManager: any = null;
+  const getClipboard = async () => {
+    if (!clipboardManager) {
+      const { ClipboardManager } = await import('./clipboardManager');
+      clipboardManager = new ClipboardManager();
+      context.subscriptions.push(clipboardManager);
+    }
+    return clipboardManager;
+  };
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.cutNode', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const cb = await getClipboard();
+      if (treeItem instanceof CodexTreeItem) {
+        cb.cut({
+          nodeId: treeItem.codexNode.id,
+          nodeType: treeItem.codexNode.type,
+          nodeName: treeItem.codexNode.name,
+          sourceUri: treeItem.documentUri,
+          sourcePath: treeItem.codexNode.path || [],
+          isFileBacked: false,
+        });
+      } else if (treeItem instanceof IndexNodeTreeItem) {
+        const nodeKind = (treeItem.indexNode as any)._node_kind;
+        cb.cut({
+          nodeId: treeItem.indexNode.id,
+          nodeType: treeItem.indexNode.type || '',
+          nodeName: treeItem.indexNode.name || treeItem.indexNode.title || '',
+          sourceUri: treeItem.documentUri,
+          sourcePath: [],
+          isFileBacked: nodeKind === 'file',
+          filePath: nodeKind === 'file' ? treeItem.indexNode._computed_path : undefined,
+        });
+      }
+      await reloadTreeIndex();
+      showTransientMessage('Cut to clipboard', 2000);
+    })
+  );
+
+  // Paste node as child
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.pasteNodeAsChild', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const cb = await getClipboard();
+      const entry = cb.getCutEntry();
+      if (!entry) {
+        vscode.window.showInformationMessage('Nothing in clipboard');
+        return;
+      }
+      if (entry.isFileBacked && treeItem instanceof IndexNodeTreeItem) {
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
+        const nodeKind = (treeItem.indexNode as any)._node_kind;
+        if (nodeKind === 'folder' && entry.filePath) {
+          const destFolder = treeItem.indexNode._computed_path || '';
+          const { getStructureEditor } = await import('./structureEditor');
+          const { getSettingsManager } = await import('./settingsManager');
+          const editor = getStructureEditor();
+          const settings = await getSettingsManager().getSettings(vscode.Uri.file(path.join(wsRoot, entry.filePath)));
+          await editor.moveFileInIndex(wsRoot, entry.filePath, destFolder, settings);
+          cb.clear();
+          await regenerateAndReload(wsRoot);
+          return;
+        }
+      }
+      cb.clear();
+      await reloadTreeIndex();
+    })
+  );
+
+  // Paste node as sibling
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.pasteNodeAsSibling', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const cb = await getClipboard();
+      const entry = cb.getCutEntry();
+      if (!entry) {
+        vscode.window.showInformationMessage('Nothing in clipboard');
+        return;
+      }
+      if (entry.isFileBacked && treeItem instanceof IndexNodeTreeItem && entry.filePath) {
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
+        const targetPath = treeItem.indexNode._computed_path;
+        if (!targetPath) return;
+        const destFolder = path.dirname(targetPath);
+        const { getStructureEditor } = await import('./structureEditor');
+        const { getSettingsManager } = await import('./settingsManager');
+        const editor = getStructureEditor();
+        const settings = await getSettingsManager().getSettings(vscode.Uri.file(path.join(wsRoot, entry.filePath)));
+        await editor.moveFileInIndex(wsRoot, entry.filePath, destFolder, settings);
+        cb.clear();
+        await regenerateAndReload(wsRoot);
+        return;
+      }
+      cb.clear();
+      await reloadTreeIndex();
+    })
+  );
+
+  // Restore from trash
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.restoreFromTrash', async () => {
+      const wsRoot = getWorkspaceRoot();
+      if (!wsRoot) return;
+      const { TrashManager } = await import('./trashManager');
+      const trash = new TrashManager(wsRoot);
+      const items = await trash.listTrash();
+      if (items.length === 0) {
+        vscode.window.showInformationMessage('Trash is empty');
+        return;
+      }
+      const picked = await vscode.window.showQuickPick(items.map(i => ({ label: i.name, item: i })), { placeHolder: 'Select item to restore' });
+      if (!picked) return;
+      await trash.restoreFromTrash(picked.item.name);
+      await regenerateAndReload(wsRoot);
+    })
+  );
+
+  // Empty trash
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.emptyTrash', async () => {
+      const wsRoot = getWorkspaceRoot();
+      if (!wsRoot) return;
+      const { TrashManager } = await import('./trashManager');
+      const trash = new TrashManager(wsRoot);
+      const hasItems = await trash.hasTrash();
+      if (!hasItems) {
+        vscode.window.showInformationMessage('Trash is already empty');
+        return;
+      }
+      const confirm = await vscode.window.showWarningMessage('Permanently delete all items in trash?', { modal: true }, 'Empty Trash');
+      if (confirm !== 'Empty Trash') return;
+      await trash.emptyTrash();
+      showTransientMessage('Trash emptied', 3000);
+    })
+  );
+
+  // Extract node to file
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.extractToFile', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const wsRoot = getWorkspaceRoot();
+      if (!wsRoot) return;
+      const { getStructureEditor } = await import('./structureEditor');
+      const { getSettingsManager } = await import('./settingsManager');
+      const editor = getStructureEditor();
+      if (treeItem instanceof CodexTreeItem) {
+        const doc = await vscode.workspace.openTextDocument(treeItem.documentUri);
+        const settings = await getSettingsManager().getSettings(doc.uri);
+        await editor.extractNodeToFile(doc, treeItem.codexNode, wsRoot, settings);
+      } else if (treeItem instanceof IndexNodeTreeItem) {
+        const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+        if (!resolved) return;
+        const settings = await getSettingsManager().getSettings(resolved.doc.uri);
+        await editor.extractNodeToFile(resolved.doc, resolved.node, wsRoot, settings);
+      }
+      await regenerateAndReload(wsRoot);
+    })
+  );
+
+  // Add child file (index folders)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.addChildFile', async (treeItem?: IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const nodeKind = (treeItem.indexNode as any)._node_kind;
+      if (nodeKind !== 'folder') return;
+      const name = await vscode.window.showInputBox({ prompt: 'Enter file name' });
+      if (!name) return;
+      if (/[/\\]/.test(name) || name === '..' || name === '.') {
+        vscode.window.showErrorMessage('Invalid file name');
+        return;
+      }
+      const wsRoot = getWorkspaceRoot();
+      if (!wsRoot) return;
+      const parentPath = treeItem.indexNode._computed_path || '';
+      const { getStructureEditor } = await import('./structureEditor');
+      const { getSettingsManager } = await import('./settingsManager');
+      const editor = getStructureEditor();
+      const settings = await getSettingsManager().getSettings(vscode.Uri.file(path.join(wsRoot, parentPath)));
+      const slugName = (editor as any).slugifyName(name, settings.naming);
+      const newFilePath = path.join(parentPath, `${slugName}.codex.yaml`);
+      const newFullPath = path.join(wsRoot, newFilePath);
+      const { isPathWithinWorkspace } = await import('./writerView/utils/helpers');
+      if (!isPathWithinWorkspace(newFullPath, wsRoot)) {
+        vscode.window.showErrorMessage('File path resolves outside workspace');
+        return;
+      }
+      const { randomUUID } = await import('crypto');
+      const content = `metadata:\n  formatVersion: "1.2"\nid: "${randomUUID()}"\ntype: chapter\nname: "${name}"\nbody: ""\n`;
+      await vscode.workspace.fs.writeFile(vscode.Uri.file(newFullPath), Buffer.from(content, 'utf-8'));
+      const { getOrderingManager } = await import('./orderingManager');
+      const om = getOrderingManager(wsRoot);
+      await om.addEntry(parentPath, { name: `${slugName}.codex.yaml`, type: 'file' });
+      await regenerateAndReload(wsRoot);
+    })
+  );
+
+  // Rename folder
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.renameFolder', async (treeItem?: IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const nodeKind = (treeItem.indexNode as any)._node_kind;
+      if (nodeKind !== 'folder') return;
+      const wsRoot = getWorkspaceRoot();
+      if (!wsRoot) return;
+      const oldPath = treeItem.indexNode._computed_path;
+      if (!oldPath) return;
+      const oldName = path.basename(oldPath);
+      const newName = await vscode.window.showInputBox({ prompt: 'Enter new folder name', value: oldName });
+      if (!newName || newName === oldName) return;
+      if (/[/\\]/.test(newName) || newName === '..' || newName === '.') {
+        vscode.window.showErrorMessage('Invalid folder name');
+        return;
+      }
+      const parentDir = path.dirname(oldPath);
+      const newPath = parentDir === '.' ? newName : path.join(parentDir, newName);
+      const oldFullPath = path.join(wsRoot, oldPath);
+      const newFullPath = path.join(wsRoot, newPath);
+      const { isPathWithinWorkspace } = await import('./writerView/utils/helpers');
+      if (!isPathWithinWorkspace(newFullPath, wsRoot)) {
+        vscode.window.showErrorMessage('Folder path resolves outside workspace');
+        return;
+      }
+      const fsPromises = await import('fs/promises');
+      await fsPromises.rename(oldFullPath, newFullPath);
+      await regenerateAndReload(wsRoot);
+    })
+  );
+
+  // Batch move to trash (multi-select)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.batchMoveToTrash', async (...args: any[]) => {
+      const items = args.length > 1 ? args[1] : args[0];
+      if (!Array.isArray(items) || items.length === 0) return;
+      const wsRoot = getWorkspaceRoot();
+      if (!wsRoot) return;
+      const { getStructureEditor } = await import('./structureEditor');
+      const { getSettingsManager } = await import('./settingsManager');
+      const editor = getStructureEditor();
+      for (const item of items) {
+        if (item instanceof IndexNodeTreeItem) {
+          const nodeKind = (item.indexNode as any)._node_kind;
+          if (nodeKind === 'file' || nodeKind === 'folder') {
+            const filePath = item.indexNode._computed_path;
+            if (!filePath) continue;
+            const settings = await getSettingsManager().getSettings(vscode.Uri.file(path.join(wsRoot, filePath)));
+            await editor.removeFileFromIndex(wsRoot, filePath, false, settings);
+          }
+        }
+      }
+      await regenerateAndReload(wsRoot);
+    })
+  );
+
+  // Batch add tags (multi-select)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.batchAddTags', async (...args: any[]) => {
+      const items = args.length > 1 ? args[1] : args[0];
+      if (!Array.isArray(items) || items.length === 0) return;
+      const input = await vscode.window.showInputBox({ prompt: 'Enter tags (comma-separated)', placeHolder: 'e.g., action, drama' });
+      if (!input) return;
+      const tags = input.split(',').map(t => t.trim()).filter(Boolean);
+      if (tags.length === 0) return;
+      const wsRoot = getWorkspaceRoot();
+      if (!wsRoot) return;
+      const { getStructureEditor } = await import('./structureEditor');
+      const editor = getStructureEditor();
+      for (const item of items) {
+        if (item instanceof IndexNodeTreeItem) {
+          const resolved = await resolveIndexNodeForEdit(item, wsRoot);
+          if (resolved) await editor.addTagsToNode(resolved.doc, resolved.node, tags);
+        }
+      }
+      await reloadTreeIndex();
+    })
+  );
+
   // Switch to INDEX mode command
   context.subscriptions.push(
     vscode.commands.registerCommand('chapterwiseCodex.switchToIndexMode', async () => {
