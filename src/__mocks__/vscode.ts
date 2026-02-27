@@ -11,6 +11,15 @@ export const window = {
 
 export const workspace = {
   applyEdit: vi.fn().mockResolvedValue(true),
+  openTextDocument: vi.fn().mockResolvedValue({ getText: () => '', uri: { fsPath: '' } }),
+  fs: {
+    stat: vi.fn().mockResolvedValue({ type: FileType.File, size: 0, ctime: 0, mtime: 0 }),
+    delete: vi.fn().mockResolvedValue(undefined),
+    readFile: vi.fn().mockResolvedValue(new Uint8Array()),
+    writeFile: vi.fn().mockResolvedValue(undefined),
+    copy: vi.fn().mockResolvedValue(undefined),
+    createDirectory: vi.fn().mockResolvedValue(undefined),
+  },
 };
 
 export class WorkspaceEdit {

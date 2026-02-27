@@ -70,7 +70,8 @@ describe('ClipboardManager', () => {
     const listener = vi.fn();
     cm.onDidChange(listener);
     cm.dispose();
-    // After dispose, firing should not call listener
-    // (EventEmitter.dispose clears listeners)
+    // After dispose, fire should not reach listener
+    (cm as any)._onDidChange.fire();
+    expect(listener).not.toHaveBeenCalled();
   });
 });
