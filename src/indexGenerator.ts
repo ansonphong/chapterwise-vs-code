@@ -1255,20 +1255,18 @@ export async function generatePerFolderIndex(
     }
   }
 
-  // Sort by order then name
-  children.sort((a, b) => {
-    const orderA = a.order ?? 999;
-    const orderB = b.order ?? 999;
-    if (orderA !== orderB) return orderA - orderB;
-    return a.name.localeCompare(b.name);
-  });
-
-  // Assign sequential orders if not set
-  children.forEach((child, index) => {
-    if (child.order === undefined || child.order === 999) {
-      child.order = index;
-    }
-  });
+  // Apply ordering from index.codex.yaml if it exists, otherwise sort by name
+  // Legacy compat: if order fields exist (pre-migration), sort by them
+  const hasExplicitOrder = children.some(c => c.order !== undefined);
+  if (hasExplicitOrder) {
+    children.sort((a, b) => {
+      const orderA = a.order ?? 999;
+      const orderB = b.order ?? 999;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.name.localeCompare(b.name);
+    });
+  }
+  // No longer assigning sequential order values — array position IS the order
 
   // Build index data
   const indexData = {

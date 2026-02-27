@@ -273,16 +273,17 @@ export class CodexDragAndDropController implements vscode.TreeDragAndDropControl
               results.failed.push({ item, reason: 'Invalid drop target or circular reference' });
               continue;
             }
-            
-            // Calculate new order
-            const newOrder = this.calculateNewOrder(target, position, siblings);
-            
-            // Reorder file in index
+
+            // Calculate target array index from target position
+            const targetIdx = siblings.findIndex((s: any) => s.id === target.indexNode.id);
+            const newPosition = position === 'before' ? Math.max(0, targetIdx) : targetIdx + 1;
+
+            // Reorder file in index (array position, not fractional order)
             const sourceFile = item.filePath || '';
             const result = await editor.reorderFileInIndex(
               workspaceRoot,
               sourceFile,
-              newOrder
+              newPosition
             );
             
             if (!result.success) {
@@ -613,58 +614,7 @@ export class CodexDragAndDropController implements vscode.TreeDragAndDropControl
     return 'after';
   }
   
-  /**
-   * Calculate new fractional order for dropped item
-   * Based on target's order and drop position
-   */
-  private calculateNewOrder(
-    target: CodexTreeItemType,
-    position: 'before' | 'after' | 'inside',
-    siblings: any[]
-  ): number {
-    if (!(target instanceof IndexNodeTreeItem)) {
-      return 0;
-    }
-    
-    const targetOrder = target.indexNode.order ?? 0;
-    
-    if (position === 'before') {
-      // Find previous sibling's order
-      const targetIndex = siblings.findIndex(s => s.id === target.indexNode.id);
-      if (targetIndex > 0) {
-        const prevOrder = siblings[targetIndex - 1].order ?? 0;
-        return (prevOrder + targetOrder) / 2;
-      } else {
-        // First item - go before
-        return targetOrder - 1;
-      }
-    }
-    
-    if (position === 'after') {
-      // Find next sibling's order
-      const targetIndex = siblings.findIndex(s => s.id === target.indexNode.id);
-      if (targetIndex >= 0 && targetIndex < siblings.length - 1) {
-        const nextOrder = siblings[targetIndex + 1].order ?? (targetOrder + 2);
-        return (targetOrder + nextOrder) / 2;
-      } else {
-        // Last item - go after
-        return targetOrder + 1;
-      }
-    }
-    
-    if (position === 'inside') {
-      // Insert as first child
-      if (target.indexNode.children && target.indexNode.children.length > 0) {
-        const firstChildOrder = target.indexNode.children[0].order ?? 0;
-        return firstChildOrder - 1;
-      } else {
-        // No children - use 0
-        return 0;
-      }
-    }
-    
-    return 0;
-  }
+  // calculateNewOrder removed — ordering now uses array position in index.codex.yaml
   
   /**
    * Get siblings for a target node (for order calculation)

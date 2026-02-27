@@ -24,7 +24,8 @@ export interface IndexChildNode {
   type: string;
   name: string; // Display name (read from file content or derived)
   title?: string; // Optional alternative title
-  order?: number; // Sort order
+  /** @deprecated Use index.codex.yaml array position instead. */
+  order?: number;
   expanded?: boolean; // Default expansion state
   emoji?: string; // Custom emoji (overrides typeStyles)
   color?: string; // Custom color (overrides typeStyles)

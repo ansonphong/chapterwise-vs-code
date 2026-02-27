@@ -1068,64 +1068,31 @@ export class CodexStructureEditor {
   async reorderFileInIndex(
     workspaceRoot: string,
     filePath: string,
-    newOrder: number
+    newPosition: number
   ): Promise<StructureOperationResult> {
     try {
       const folderPath = path.dirname(filePath);
       const fileName = path.basename(filePath);
-      const perFolderIndexPath = path.join(
-        workspaceRoot,
-        folderPath,
-        '.index.codex.json'
-      );
-      
-      // Check if per-folder index exists
-      if (!await fileExists(perFolderIndexPath)) {
-        // Generate per-folder index first
-        await generatePerFolderIndex(workspaceRoot, folderPath);
-      }
 
-      // Read per-folder index
-      const indexContent = await fsPromises.readFile(perFolderIndexPath, 'utf-8');
-      const indexData = JSON.parse(indexContent);
+      // Delegate to OrderingManager (array position = source of truth)
+      const { getOrderingManager } = await import('./orderingManager');
+      const om = getOrderingManager(workspaceRoot);
+      const result = await om.moveToPosition(folderPath === '.' ? '' : folderPath, fileName, newPosition);
 
-      // Find the file node in children
-      const children = indexData.children;
-      if (!children || !Array.isArray(children)) {
+      if (!result) {
         return {
           success: false,
-          message: 'Invalid index structure: no children found'
+          message: `File not found in ordering index: ${fileName}`
         };
       }
 
-      // Find node by _filename
-      let found = false;
-      for (const child of children) {
-        if (child._filename === fileName) {
-          child.order = newOrder;
-          found = true;
-          break;
-        }
-      }
-
-      if (!found) {
-        return {
-          success: false,
-          message: `File not found in index: ${fileName}`
-        };
-      }
-
-      // Write back per-folder index
-      await fsPromises.writeFile(perFolderIndexPath, JSON.stringify(indexData, null, 2), 'utf-8');
-
-      // Cascade regenerate all parent indexes
+      // Cascade regenerate .index.codex.json cache
       await cascadeRegenerateIndexes(workspaceRoot, folderPath);
-      
+
       return {
         success: true,
-        message: `Reordered ${fileName} to order ${newOrder}`,
+        message: `Reordered ${fileName} to position ${newPosition}`,
         newPath: filePath,
-        affectedFiles: [perFolderIndexPath]
       };
     } catch (error) {
       return {
@@ -1149,78 +1116,26 @@ export class CodexStructureEditor {
     try {
       const folderPath = path.dirname(filePath);
       const fileName = path.basename(filePath);
-      const perFolderIndexPath = path.join(
-        workspaceRoot,
-        folderPath,
-        '.index.codex.json'
-      );
-      
-      // Check if per-folder index exists
-      if (!await fileExists(perFolderIndexPath)) {
+
+      // Delegate to OrderingManager (array position swap)
+      const { getOrderingManager } = await import('./orderingManager');
+      const om = getOrderingManager(workspaceRoot);
+      const result = await om.moveUp(folderPath === '.' ? '' : folderPath, fileName);
+
+      if (!result) {
         return {
           success: false,
-          message: 'Index file not found. Generate index first.'
+          message: 'Already at the top of the list or not found'
         };
       }
 
-      // Read per-folder index
-      const indexContent = await fsPromises.readFile(perFolderIndexPath, 'utf-8');
-      const indexData = JSON.parse(indexContent);
-
-      // Find the file node in children
-      const children = indexData.children;
-      if (!children || !Array.isArray(children)) {
-        return {
-          success: false,
-          message: 'Invalid index structure: no children found'
-        };
-      }
-
-      // Find node by _filename and get siblings
-      let currentIndex = -1;
-      for (let i = 0; i < children.length; i++) {
-        if (children[i]._filename === fileName) {
-          currentIndex = i;
-          break;
-        }
-      }
-
-      if (currentIndex === -1) {
-        return {
-          success: false,
-          message: `File not found in index: ${fileName}`
-        };
-      }
-
-      // Check if already at top
-      if (currentIndex === 0) {
-        return {
-          success: false,
-          message: 'Already at the top of the list'
-        };
-      }
-
-      // Swap order values with previous sibling
-      const currentNode = children[currentIndex];
-      const previousNode = children[currentIndex - 1];
-
-      const currentOrder = currentNode.order ?? currentIndex;
-      const previousOrder = previousNode.order ?? (currentIndex - 1);
-
-      currentNode.order = previousOrder;
-      previousNode.order = currentOrder;
-
-      // Write back per-folder index
-      await fsPromises.writeFile(perFolderIndexPath, JSON.stringify(indexData, null, 2), 'utf-8');
-
-      // Cascade regenerate all parent indexes
+      // Cascade regenerate .index.codex.json cache
       await cascadeRegenerateIndexes(workspaceRoot, folderPath);
-      
+
       return {
         success: true,
         message: `Moved ${fileName} up`,
         newPath: filePath,
-        affectedFiles: [perFolderIndexPath]
       };
     } catch (error) {
       return {
@@ -1244,78 +1159,26 @@ export class CodexStructureEditor {
     try {
       const folderPath = path.dirname(filePath);
       const fileName = path.basename(filePath);
-      const perFolderIndexPath = path.join(
-        workspaceRoot,
-        folderPath,
-        '.index.codex.json'
-      );
-      
-      // Check if per-folder index exists
-      if (!await fileExists(perFolderIndexPath)) {
+
+      // Delegate to OrderingManager (array position swap)
+      const { getOrderingManager } = await import('./orderingManager');
+      const om = getOrderingManager(workspaceRoot);
+      const result = await om.moveDown(folderPath === '.' ? '' : folderPath, fileName);
+
+      if (!result) {
         return {
           success: false,
-          message: 'Index file not found. Generate index first.'
+          message: 'Already at the bottom of the list or not found'
         };
       }
 
-      // Read per-folder index
-      const indexContent = await fsPromises.readFile(perFolderIndexPath, 'utf-8');
-      const indexData = JSON.parse(indexContent);
-
-      // Find the file node in children
-      const children = indexData.children;
-      if (!children || !Array.isArray(children)) {
-        return {
-          success: false,
-          message: 'Invalid index structure: no children found'
-        };
-      }
-
-      // Find node by _filename and get siblings
-      let currentIndex = -1;
-      for (let i = 0; i < children.length; i++) {
-        if (children[i]._filename === fileName) {
-          currentIndex = i;
-          break;
-        }
-      }
-
-      if (currentIndex === -1) {
-        return {
-          success: false,
-          message: `File not found in index: ${fileName}`
-        };
-      }
-
-      // Check if already at bottom
-      if (currentIndex === children.length - 1) {
-        return {
-          success: false,
-          message: 'Already at the bottom of the list'
-        };
-      }
-
-      // Swap order values with next sibling
-      const currentNode = children[currentIndex];
-      const nextNode = children[currentIndex + 1];
-
-      const currentOrder = currentNode.order ?? currentIndex;
-      const nextOrder = nextNode.order ?? (currentIndex + 1);
-
-      currentNode.order = nextOrder;
-      nextNode.order = currentOrder;
-
-      // Write back per-folder index
-      await fsPromises.writeFile(perFolderIndexPath, JSON.stringify(indexData, null, 2), 'utf-8');
-
-      // Cascade regenerate all parent indexes
+      // Cascade regenerate .index.codex.json cache
       await cascadeRegenerateIndexes(workspaceRoot, folderPath);
-      
+
       return {
         success: true,
         message: `Moved ${fileName} down`,
         newPath: filePath,
-        affectedFiles: [perFolderIndexPath]
       };
     } catch (error) {
       return {
@@ -1326,111 +1189,17 @@ export class CodexStructureEditor {
   }
   
   /**
-   * Renormalize order values in a folder to sequential integers (0, 1, 2, ...)
-   * Preserves the current sort order
-   * 
-   * @param workspaceRoot - Root of the workspace
-   * @param folderPath - Folder path (relative to workspace) - e.g., "E02/chapters"
-   * @returns Result of the operation
+   * @deprecated No longer needed — ordering is managed by index.codex.yaml array position.
+   * Kept as no-op for backward compatibility.
    */
   async autofixFolderOrder(
-    workspaceRoot: string,
-    folderPath: string
+    _workspaceRoot: string,
+    _folderPath: string
   ): Promise<StructureOperationResult> {
-    try {
-      // Find the parent index that contains this folder
-      // For "E02/chapters", look in "E02/.index.codex.json"
-      // For "E02", look in workspace root ".index.codex.json"
-      const folderParts = folderPath.split(path.sep);
-      const folderName = folderParts[folderParts.length - 1];
-      const parentPath = folderParts.slice(0, -1).join(path.sep);
-
-      // Find the index file that contains this folder
-      let indexPath: string;
-      if (parentPath) {
-        indexPath = path.join(workspaceRoot, parentPath, '.index.codex.json');
-      } else {
-        indexPath = path.join(workspaceRoot, '.index.codex.json');
-      }
-
-      // Check if index exists
-      if (!await fileExists(indexPath)) {
-        return {
-          success: false,
-          message: `Index file not found at: ${indexPath}`
-        };
-      }
-
-      // Read index
-      const indexContent = await fsPromises.readFile(indexPath, 'utf-8');
-      const indexData = JSON.parse(indexContent);
-
-      // Find the folder node within the index
-      const rootChildren = indexData.children;
-      if (!rootChildren || !Array.isArray(rootChildren)) {
-        return {
-          success: false,
-          message: 'Invalid index structure: no children found at root'
-        };
-      }
-
-      // Find the folder node by name or _computed_path
-      let folderNode: any = null;
-      for (const child of rootChildren) {
-        if (child.type === 'folder' &&
-            (child.name === folderName || child._computed_path === folderPath)) {
-          folderNode = child;
-          break;
-        }
-      }
-
-      if (!folderNode) {
-        return {
-          success: false,
-          message: `Folder "${folderName}" not found in index at ${indexPath}`
-        };
-      }
-
-      // Get children of the folder
-      const folderChildren = folderNode.children;
-      if (!folderChildren || !Array.isArray(folderChildren) || folderChildren.length === 0) {
-        return {
-          success: true,
-          message: `Folder "${folderName}" has no children`,
-          affectedFiles: []
-        };
-      }
-
-      // Sort children by current order, then by name
-      folderChildren.sort((a: any, b: any) => {
-        const orderA = a.order ?? Infinity;
-        const orderB = b.order ?? Infinity;
-        if (orderA !== orderB) return orderA - orderB;
-
-        const nameA = a.name || '';
-        const nameB = b.name || '';
-        return nameA.localeCompare(nameB);
-      });
-
-      // Renormalize: assign 0, 1, 2, ...
-      folderChildren.forEach((child: any, index: number) => {
-        child.order = index;
-      });
-
-      // Write back to index
-      await fsPromises.writeFile(indexPath, JSON.stringify(indexData, null, 2), 'utf-8');
-      
-      return {
-        success: true,
-        message: `Renormalized ${folderChildren.length} items in "${folderName}"`,
-        affectedFiles: [indexPath]
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: `Failed to autofix folder order: ${error instanceof Error ? error.message : String(error)}`
-      };
-    }
+    return {
+      success: true,
+      message: 'No-op: ordering is now managed by index.codex.yaml array position',
+    };
   }
   
   /**

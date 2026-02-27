@@ -84,6 +84,99 @@ const subIndexViews: vscode.TreeView<CodexTreeItemType>[] = [];
 // Search index manager
 let searchIndexManager: SearchIndexManager | null = null;
 
+// ============================================================================
+// Shared Helpers (used by command handlers across all stages)
+// ============================================================================
+
+/** Get the first workspace folder's root path. */
+function getWorkspaceRoot(): string | undefined {
+  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+}
+
+/** Resolve an IndexNodeTreeItem to its backing document + CodexNode. */
+async function resolveIndexNodeForEdit(treeItem: IndexNodeTreeItem, wsRoot: string): Promise<{ doc: vscode.TextDocument; node: any } | null> {
+  const nodeKind = (treeItem.indexNode as any)._node_kind;
+  if (nodeKind === 'file') {
+    const computedPath = treeItem.indexNode._computed_path;
+    if (!computedPath) return null;
+    const fullPath = path.join(wsRoot, computedPath);
+    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));
+    const { parseCodex } = await import('./codexModel');
+    const codexDoc = parseCodex(doc.getText());
+    if (!codexDoc || !codexDoc.rootNode) return null;
+    return { doc, node: codexDoc.rootNode };
+  }
+  const parentFile = (treeItem.indexNode as any)._parent_file;
+  if (!parentFile) {
+    if (treeItem.resourceUri) {
+      const doc = await vscode.workspace.openTextDocument(treeItem.resourceUri);
+      const { parseCodex } = await import('./codexModel');
+      const codexDoc = parseCodex(doc.getText());
+      if (!codexDoc) return null;
+      const node = codexDoc.allNodes.find((n: any) => n.id === treeItem.indexNode.id);
+      return node ? { doc, node } : null;
+    }
+    return null;
+  }
+  const fullPath = path.join(wsRoot, parentFile);
+  const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));
+  const { parseCodex } = await import('./codexModel');
+  const codexDoc = parseCodex(doc.getText());
+  if (!codexDoc) return null;
+  const node = codexDoc.allNodes.find((n: any) => n.id === treeItem.indexNode.id);
+  return node ? { doc, node } : null;
+}
+
+/**
+ * Reload the tree index from disk. Safe for null contextFolder.
+ * WARNING (Fact #48): This only READS existing .index.codex.json cache.
+ * If files were mutated on disk, call regenerateAndReload() instead.
+ */
+async function reloadTreeIndex(): Promise<void> {
+  const wsRoot = getWorkspaceRoot();
+  if (!wsRoot) return;
+  const contextFolder = treeProvider.getContextFolder();
+  if (contextFolder) {
+    await treeProvider.setContextFolder(contextFolder, wsRoot);
+  } else if (treeProvider.getNavigationMode() === 'index') {
+    await treeProvider.setContextFolder('.', wsRoot);
+  } else {
+    treeProvider.refresh();
+  }
+}
+
+/**
+ * Regenerate .index.codex.json cache from disk, THEN reload tree + stacked views.
+ * Use after operations that mutate files on disk (create/delete/move/rename/duplicate).
+ * Fact #52: Uses cascadeRegenerateIndexes() for per-folder + top-level indexes.
+ */
+async function regenerateAndReload(wsRoot: string): Promise<void> {
+  const contextFolder = treeProvider.getContextFolder();
+  const folderToRegenerate = contextFolder || '.';
+
+  // Step 1: Regenerate per-folder + top-level indexes
+  const { cascadeRegenerateIndexes } = await import('./indexGenerator');
+  await cascadeRegenerateIndexes(wsRoot, folderToRegenerate);
+
+  // Step 2: Reload Navigator tree from regenerated cache
+  await reloadTreeIndex();
+
+  // Step 3: Refresh stacked views (Master + Index0-7) if in stacked mode
+  if (multiIndexManager && masterTreeProvider) {
+    await multiIndexManager.discoverIndexes(wsRoot);
+    masterTreeProvider.setManager(multiIndexManager, wsRoot);
+    const subIndexes = multiIndexManager.getSubIndexes();
+    subIndexes.forEach((index: any, i: number) => {
+      if (i < subIndexProviders.length) {
+        subIndexProviders[i].setIndex(index);
+      }
+    });
+    for (let i = subIndexes.length; i < subIndexProviders.length; i++) {
+      subIndexProviders[i].setIndex(null);
+    }
+  }
+}
+
 /**
  * Get the output channel for logging
  */
@@ -240,6 +333,20 @@ export function activate(context: vscode.ExtensionContext): void {
     } catch (error) {
       outputChannel.appendLine(`[WARNING] Multi-index initialization failed (non-critical): ${error}`);
       console.warn('Multi-index initialization failed:', error);
+    }
+
+    // Sync ordering index on startup (non-blocking)
+    const wsRootForSync = getWorkspaceRoot();
+    if (wsRootForSync) {
+      void (async () => {
+        try {
+          const { getOrderingManager } = await import('./orderingManager');
+          const om = getOrderingManager(wsRootForSync);
+          await om.syncWithFilesystem();
+        } catch (e) {
+          console.error('[ChapterWise Codex] Failed to sync ordering index:', e);
+        }
+      })();
     }
 
     // Initialize Writer View manager
