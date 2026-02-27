@@ -39,4 +39,46 @@ export class ThemeColor {
 
 export class Uri {
   static file(p: string) { return { fsPath: p, scheme: 'file', path: p }; }
+  static parse(s: string) { return { fsPath: s, scheme: 'file', path: s }; }
 }
+
+export class Position {
+  constructor(public line: number, public character: number) {}
+}
+
+export class Selection {
+  constructor(public anchor: Position, public active: Position) {}
+}
+
+export class EventEmitter<T = void> {
+  private listeners: Array<(e: T) => void> = [];
+  event = (listener: (e: T) => void) => {
+    this.listeners.push(listener);
+    return { dispose: () => { this.listeners = this.listeners.filter(l => l !== listener); } };
+  };
+  fire(data?: T) {
+    this.listeners.forEach(l => l(data as T));
+  }
+  dispose() {
+    this.listeners = [];
+  }
+}
+
+export enum FileType {
+  Unknown = 0,
+  File = 1,
+  Directory = 2,
+  SymbolicLink = 64,
+}
+
+export const env = {
+  clipboard: {
+    writeText: vi.fn(),
+    readText: vi.fn().mockResolvedValue(''),
+  },
+};
+
+export const commands = {
+  executeCommand: vi.fn(),
+  registerCommand: vi.fn(),
+};
