@@ -187,7 +187,7 @@
         "icon": "$(home)"
       },
       {
-        "command": "chapterwiseCodex.navigateToNodeInCodeView",
+        "command": "chapterwiseCodex.navigateToEntityInCodeView",
         "title": "Open in Code View",
         "icon": "$(code)"
       },
@@ -195,6 +195,102 @@
         "command": "chapterwiseCodex.navigateToFieldInCodeView",
         "title": "Open Field in Code View",
         "icon": "$(code)"
+      },
+      {
+        "command": "chapterwiseCodex.addField",
+        "title": "Add Field"
+      },
+      {
+        "command": "chapterwiseCodex.deleteField",
+        "title": "Delete Field"
+      },
+      {
+        "command": "chapterwiseCodex.renameField",
+        "title": "Rename Field"
+      },
+      {
+        "command": "chapterwiseCodex.changeType",
+        "title": "Change Type"
+      },
+      {
+        "command": "chapterwiseCodex.changeIcon",
+        "title": "Change Icon/Emoji"
+      },
+      {
+        "command": "chapterwiseCodex.addTags",
+        "title": "Add Tags"
+      },
+      {
+        "command": "chapterwiseCodex.addRelation",
+        "title": "Add Relation"
+      },
+      {
+        "command": "chapterwiseCodex.duplicateNode",
+        "title": "Duplicate",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "chapterwiseCodex.cutNode",
+        "title": "Cut",
+        "icon": "$(cut)"
+      },
+      {
+        "command": "chapterwiseCodex.pasteNodeAsChild",
+        "title": "Paste as Child"
+      },
+      {
+        "command": "chapterwiseCodex.pasteNodeAsSibling",
+        "title": "Paste as Sibling"
+      },
+      {
+        "command": "chapterwiseCodex.extractToFile",
+        "title": "Extract to File"
+      },
+      {
+        "command": "chapterwiseCodex.moveToTrash",
+        "title": "Move to Trash",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "chapterwiseCodex.restoreFromTrash",
+        "title": "Restore from Trash"
+      },
+      {
+        "command": "chapterwiseCodex.emptyTrash",
+        "title": "Empty Trash"
+      },
+      {
+        "command": "chapterwiseCodex.openInFinder",
+        "title": "Reveal in File Explorer"
+      },
+      {
+        "command": "chapterwiseCodex.copyPath",
+        "title": "Copy Path"
+      },
+      {
+        "command": "chapterwiseCodex.addChildFile",
+        "title": "Add File"
+      },
+      {
+        "command": "chapterwiseCodex.addChildFolder",
+        "title": "New Subfolder"
+      },
+      {
+        "command": "chapterwiseCodex.inlineThisFile",
+        "title": "Inline This File"
+      },
+      {
+        "command": "chapterwiseCodex.renameFolder",
+        "title": "Rename Folder"
+      },
+      {
+        "command": "chapterwiseCodex.batchMoveToTrash",
+        "title": "Move Selected to Trash",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "chapterwiseCodex.batchAddTags",
+        "title": "Add Tags to Selected"
       },
       {
         "command": "chapterwiseCodex.importScrivener",
@@ -349,89 +445,394 @@
       "view/item/context": [
         {
           "command": "chapterwiseCodex.openWriterView",
-          "when": "view == chapterwiseCodexNavigator && viewItem == codexNode",
+          "when": "viewItem == codexNode",
           "group": "inline"
         },
         {
           "command": "chapterwiseCodex.addChildNode",
-          "when": "view == chapterwiseCodexNavigator && viewItem == codexNode",
+          "when": "viewItem == codexNode",
           "group": "1_add@1"
         },
         {
           "command": "chapterwiseCodex.addSiblingNode",
-          "when": "view == chapterwiseCodexNavigator && viewItem == codexNode",
+          "when": "viewItem == codexNode",
           "group": "1_add@2"
         },
         {
+          "command": "chapterwiseCodex.addField",
+          "when": "viewItem == codexNode",
+          "group": "1_add@3"
+        },
+        {
           "command": "chapterwiseCodex.renameNode",
-          "when": "view == chapterwiseCodexNavigator && viewItem == codexNode",
+          "when": "viewItem == codexNode",
           "group": "2_edit@1"
         },
         {
           "command": "chapterwiseCodex.changeColor",
-          "when": "view == chapterwiseCodexNavigator && viewItem == codexNode",
+          "when": "viewItem == codexNode",
           "group": "2_edit@2"
         },
         {
-          "command": "chapterwiseCodex.moveNodeUp",
-          "when": "view == chapterwiseCodexNavigator && viewItem == codexNode",
-          "group": "3_move@1"
+          "command": "chapterwiseCodex.changeType",
+          "when": "viewItem == codexNode",
+          "group": "2_edit@3"
         },
         {
-          "command": "chapterwiseCodex.moveNodeDown",
-          "when": "view == chapterwiseCodexNavigator && viewItem == codexNode",
-          "group": "3_move@2"
+          "command": "chapterwiseCodex.changeIcon",
+          "when": "viewItem == codexNode",
+          "group": "2_edit@4"
+        },
+        {
+          "command": "chapterwiseCodex.addTags",
+          "when": "viewItem == codexNode",
+          "group": "2_edit@5"
+        },
+        {
+          "command": "chapterwiseCodex.addRelation",
+          "when": "viewItem == codexNode",
+          "group": "2_edit@6"
+        },
+        {
+          "command": "chapterwiseCodex.cutNode",
+          "when": "viewItem == codexNode",
+          "group": "3_move@3"
+        },
+        {
+          "command": "chapterwiseCodex.pasteNodeAsChild",
+          "when": "viewItem == codexNode",
+          "group": "3_move@4"
+        },
+        {
+          "command": "chapterwiseCodex.pasteNodeAsSibling",
+          "when": "viewItem == codexNode",
+          "group": "3_move@5"
         },
         {
           "command": "chapterwiseCodex.goToYaml",
-          "when": "view == chapterwiseCodexNavigator && viewItem == codexNode",
+          "when": "viewItem == codexNode",
           "group": "4_navigate@1"
         },
         {
           "command": "chapterwiseCodex.copyId",
-          "when": "view == chapterwiseCodexNavigator && viewItem == codexNode",
+          "when": "viewItem == codexNode",
           "group": "4_navigate@2"
         },
         {
-          "command": "chapterwiseCodex.removeNode",
-          "when": "view == chapterwiseCodexNavigator && viewItem == codexNode",
+          "command": "chapterwiseCodex.duplicateNode",
+          "when": "viewItem == codexNode",
+          "group": "4_navigate@3"
+        },
+        {
+          "command": "chapterwiseCodex.extractToFile",
+          "when": "viewItem == codexNode",
+          "group": "4_navigate@4"
+        },
+        {
+          "command": "chapterwiseCodex.moveToTrash",
+          "when": "viewItem == codexNode",
           "group": "5_delete@1"
         },
         {
           "command": "chapterwiseCodex.deleteNodePermanently",
-          "when": "view == chapterwiseCodexNavigator && viewItem == codexNode",
+          "when": "viewItem == codexNode",
+          "group": "5_delete@2"
+        },
+
+        {
+          "command": "chapterwiseCodex.addChildNode",
+          "when": "viewItem == indexNode",
+          "group": "1_add@1"
+        },
+        {
+          "command": "chapterwiseCodex.addSiblingNode",
+          "when": "viewItem == indexNode",
+          "group": "1_add@2"
+        },
+        {
+          "command": "chapterwiseCodex.addField",
+          "when": "viewItem == indexNode",
+          "group": "1_add@3"
+        },
+        {
+          "command": "chapterwiseCodex.renameNode",
+          "when": "viewItem == indexNode",
+          "group": "2_edit@1"
+        },
+        {
+          "command": "chapterwiseCodex.changeType",
+          "when": "viewItem == indexNode",
+          "group": "2_edit@2"
+        },
+        {
+          "command": "chapterwiseCodex.changeIcon",
+          "when": "viewItem == indexNode",
+          "group": "2_edit@3"
+        },
+        {
+          "command": "chapterwiseCodex.addTags",
+          "when": "viewItem == indexNode",
+          "group": "2_edit@4"
+        },
+        {
+          "command": "chapterwiseCodex.addRelation",
+          "when": "viewItem == indexNode",
+          "group": "2_edit@5"
+        },
+        {
+          "command": "chapterwiseCodex.moveNodeUp",
+          "when": "viewItem == indexNode",
+          "group": "3_move@1"
+        },
+        {
+          "command": "chapterwiseCodex.moveNodeDown",
+          "when": "viewItem == indexNode",
+          "group": "3_move@2"
+        },
+        {
+          "command": "chapterwiseCodex.cutNode",
+          "when": "viewItem == indexNode",
+          "group": "3_move@3"
+        },
+        {
+          "command": "chapterwiseCodex.pasteNodeAsChild",
+          "when": "viewItem == indexNode",
+          "group": "3_move@4"
+        },
+        {
+          "command": "chapterwiseCodex.pasteNodeAsSibling",
+          "when": "viewItem == indexNode",
+          "group": "3_move@5"
+        },
+        {
+          "command": "chapterwiseCodex.goToYaml",
+          "when": "viewItem == indexNode",
+          "group": "4_navigate@1"
+        },
+        {
+          "command": "chapterwiseCodex.copyId",
+          "when": "viewItem == indexNode",
+          "group": "4_navigate@2"
+        },
+        {
+          "command": "chapterwiseCodex.duplicateNode",
+          "when": "viewItem == indexNode",
+          "group": "4_navigate@3"
+        },
+        {
+          "command": "chapterwiseCodex.moveToTrash",
+          "when": "viewItem == indexNode",
+          "group": "5_delete@1"
+        },
+        {
+          "command": "chapterwiseCodex.deleteNodePermanently",
+          "when": "viewItem == indexNode",
           "group": "5_delete@2"
         },
         {
           "command": "chapterwiseCodex.navigateToNode",
-          "when": "view == chapterwiseCodexNavigator && viewItem == indexNode",
+          "when": "viewItem == indexNode",
           "group": "navigation@1"
         },
         {
-          "command": "chapterwiseCodex.navigateToNodeInCodeView",
-          "when": "view == chapterwiseCodexNavigator && viewItem == indexNode",
+          "command": "chapterwiseCodex.navigateToEntityInCodeView",
+          "when": "viewItem == indexNode",
           "group": "navigation@2"
+        },
+
+        {
+          "command": "chapterwiseCodex.addChildNode",
+          "when": "viewItem == indexFile",
+          "group": "1_add@1"
+        },
+        {
+          "command": "chapterwiseCodex.addSiblingNode",
+          "when": "viewItem == indexFile",
+          "group": "1_add@2"
+        },
+        {
+          "command": "chapterwiseCodex.addField",
+          "when": "viewItem == indexFile",
+          "group": "1_add@3"
+        },
+        {
+          "command": "chapterwiseCodex.renameNode",
+          "when": "viewItem == indexFile",
+          "group": "2_edit@1"
+        },
+        {
+          "command": "chapterwiseCodex.changeType",
+          "when": "viewItem == indexFile",
+          "group": "2_edit@2"
+        },
+        {
+          "command": "chapterwiseCodex.changeIcon",
+          "when": "viewItem == indexFile",
+          "group": "2_edit@3"
+        },
+        {
+          "command": "chapterwiseCodex.addTags",
+          "when": "viewItem == indexFile",
+          "group": "2_edit@4"
+        },
+        {
+          "command": "chapterwiseCodex.moveNodeUp",
+          "when": "viewItem == indexFile",
+          "group": "3_move@1"
+        },
+        {
+          "command": "chapterwiseCodex.moveNodeDown",
+          "when": "viewItem == indexFile",
+          "group": "3_move@2"
+        },
+        {
+          "command": "chapterwiseCodex.cutNode",
+          "when": "viewItem == indexFile",
+          "group": "3_move@3"
+        },
+        {
+          "command": "chapterwiseCodex.pasteNodeAsChild",
+          "when": "viewItem == indexFile",
+          "group": "3_move@4"
+        },
+        {
+          "command": "chapterwiseCodex.pasteNodeAsSibling",
+          "when": "viewItem == indexFile",
+          "group": "3_move@5"
+        },
+        {
+          "command": "chapterwiseCodex.openInFinder",
+          "when": "viewItem == indexFile",
+          "group": "4_navigate@1"
+        },
+        {
+          "command": "chapterwiseCodex.copyPath",
+          "when": "viewItem == indexFile",
+          "group": "4_navigate@2"
+        },
+        {
+          "command": "chapterwiseCodex.duplicateNode",
+          "when": "viewItem == indexFile",
+          "group": "4_navigate@3"
+        },
+        {
+          "command": "chapterwiseCodex.moveToTrash",
+          "when": "viewItem == indexFile",
+          "group": "5_delete@1"
+        },
+        {
+          "command": "chapterwiseCodex.deleteNodePermanently",
+          "when": "viewItem == indexFile",
+          "group": "5_delete@2"
+        },
+
+        {
+          "command": "chapterwiseCodex.addChildFile",
+          "when": "viewItem == indexFolder",
+          "group": "1_add@1"
+        },
+        {
+          "command": "chapterwiseCodex.addChildFolder",
+          "when": "viewItem == indexFolder",
+          "group": "1_add@2"
+        },
+        {
+          "command": "chapterwiseCodex.renameFolder",
+          "when": "viewItem == indexFolder",
+          "group": "2_edit@1"
+        },
+        {
+          "command": "chapterwiseCodex.openInFinder",
+          "when": "viewItem == indexFolder",
+          "group": "4_navigate@1"
+        },
+        {
+          "command": "chapterwiseCodex.moveToTrash",
+          "when": "viewItem == indexFolder",
+          "group": "5_delete@1"
+        },
+
+        {
+          "command": "chapterwiseCodex.renameField",
+          "when": "viewItem == codexField",
+          "group": "2_edit@1"
+        },
+        {
+          "command": "chapterwiseCodex.goToYaml",
+          "when": "viewItem == codexField",
+          "group": "4_navigate@1"
+        },
+        {
+          "command": "chapterwiseCodex.deleteField",
+          "when": "viewItem == codexField",
+          "group": "5_delete@1"
+        },
+        {
+          "command": "chapterwiseCodex.renameField",
+          "when": "viewItem == indexField",
+          "group": "2_edit@1"
+        },
+        {
+          "command": "chapterwiseCodex.goToYaml",
+          "when": "viewItem == indexField",
+          "group": "4_navigate@1"
+        },
+        {
+          "command": "chapterwiseCodex.deleteField",
+          "when": "viewItem == indexField",
+          "group": "5_delete@1"
         },
         {
           "command": "chapterwiseCodex.navigateToField",
-          "when": "view == chapterwiseCodexNavigator && viewItem == indexField",
+          "when": "viewItem == indexField",
           "group": "navigation@1"
         },
         {
           "command": "chapterwiseCodex.navigateToFieldInCodeView",
-          "when": "view == chapterwiseCodexNavigator && viewItem == indexField",
+          "when": "viewItem == indexField",
           "group": "navigation@2"
+        },
+
+        {
+          "command": "chapterwiseCodex.batchMoveToTrash",
+          "when": "viewItem == codexNode && listMultiSelection",
+          "group": "5_delete@1"
+        },
+        {
+          "command": "chapterwiseCodex.batchAddTags",
+          "when": "viewItem == codexNode && listMultiSelection",
+          "group": "2_edit@1"
+        },
+        {
+          "command": "chapterwiseCodex.batchMoveToTrash",
+          "when": "viewItem == indexNode && listMultiSelection",
+          "group": "5_delete@1"
+        },
+        {
+          "command": "chapterwiseCodex.batchAddTags",
+          "when": "viewItem == indexNode && listMultiSelection",
+          "group": "2_edit@1"
+        },
+        {
+          "command": "chapterwiseCodex.batchMoveToTrash",
+          "when": "viewItem == indexFile && listMultiSelection",
+          "group": "5_delete@1"
+        },
+        {
+          "command": "chapterwiseCodex.batchAddTags",
+          "when": "viewItem == indexFile && listMultiSelection",
+          "group": "2_edit@1"
         }
       ],
       "view/item/inline": [
         {
-          "command": "chapterwiseCodex.navigateToNodeInCodeView",
-          "when": "view == chapterwiseCodexNavigator && viewItem == indexNode",
+          "command": "chapterwiseCodex.navigateToEntityInCodeView",
+          "when": "viewItem == indexNode",
           "group": "inline"
         },
         {
           "command": "chapterwiseCodex.navigateToFieldInCodeView",
-          "when": "view == chapterwiseCodexNavigator && viewItem == indexField",
+          "when": "viewItem == indexField",
           "group": "inline"
         }
       ],
@@ -479,7 +880,7 @@
         "command": "chapterwiseCodex.search",
         "key": "ctrl+alt+f",
         "mac": "cmd+alt+f",
-        "when": "view.chapterwiseCodexNavigator.visible"
+        "when": "focusedView =~ /^chapterwiseCodex/"
       },
       {
         "command": "chapterwiseCodex.openWriterView",
@@ -497,37 +898,66 @@
         "command": "chapterwiseCodex.addChildNode",
         "key": "ctrl+shift+n",
         "mac": "cmd+shift+n",
-        "when": "focusedView == chapterwiseCodexNavigator"
+        "when": "focusedView =~ /^chapterwiseCodex/"
+      },
+      {
+        "command": "chapterwiseCodex.addSiblingNode",
+        "key": "ctrl+n",
+        "mac": "cmd+n",
+        "when": "focusedView =~ /^chapterwiseCodex/"
+      },
+      {
+        "command": "chapterwiseCodex.renameNode",
+        "key": "f2",
+        "when": "focusedView =~ /^chapterwiseCodex/"
       },
       {
         "command": "chapterwiseCodex.changeColor",
         "key": "ctrl+shift+c",
         "mac": "cmd+shift+c",
-        "when": "focusedView == chapterwiseCodexNavigator"
+        "when": "focusedView =~ /^chapterwiseCodex/"
       },
       {
-        "command": "chapterwiseCodex.removeNode",
+        "command": "chapterwiseCodex.duplicateNode",
+        "key": "ctrl+d",
+        "mac": "cmd+d",
+        "when": "focusedView =~ /^chapterwiseCodex/"
+      },
+      {
+        "command": "chapterwiseCodex.cutNode",
+        "key": "ctrl+x",
+        "mac": "cmd+x",
+        "when": "focusedView =~ /^chapterwiseCodex/"
+      },
+      {
+        "command": "chapterwiseCodex.pasteNodeAsChild",
+        "key": "ctrl+v",
+        "mac": "cmd+v",
+        "when": "focusedView =~ /^chapterwiseCodex/"
+      },
+      {
+        "command": "chapterwiseCodex.moveToTrash",
         "key": "delete",
         "mac": "delete",
-        "when": "focusedView == chapterwiseCodexNavigator"
+        "when": "focusedView =~ /^chapterwiseCodex/"
       },
       {
         "command": "chapterwiseCodex.deleteNodePermanently",
         "key": "shift+delete",
         "mac": "shift+delete",
-        "when": "focusedView == chapterwiseCodexNavigator"
+        "when": "focusedView =~ /^chapterwiseCodex/"
       },
       {
         "command": "chapterwiseCodex.moveNodeUp",
         "key": "ctrl+up",
         "mac": "cmd+up",
-        "when": "focusedView == chapterwiseCodexNavigator"
+        "when": "focusedView =~ /^chapterwiseCodex/"
       },
       {
         "command": "chapterwiseCodex.moveNodeDown",
         "key": "ctrl+down",
         "mac": "cmd+down",
-        "when": "focusedView == chapterwiseCodexNavigator"
+        "when": "focusedView =~ /^chapterwiseCodex/"
       }
     ],
     "snippets": [
