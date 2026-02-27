@@ -316,18 +316,21 @@ export class CodexStructureEditor {
         }
       }
       
-      // Backup if configured
-      if (settings.safety.backupBeforeDestruct && permanent) {
-        const backupPath = `${fullPath}.backup`;
-        await fsPromises.copyFile(fullPath, backupPath);
-      }
-      
-      // Delete the file
+      // Delete or move to trash
       const fileUri = vscode.Uri.file(fullPath);
-      await vscode.workspace.fs.delete(fileUri, {
-        recursive: false,
-        useTrash: !permanent
-      });
+      if (permanent) {
+        const stat = await vscode.workspace.fs.stat(fileUri);
+        const isDir = stat.type === vscode.FileType.Directory;
+        if (settings.safety.backupBeforeDestruct && !isDir) {
+          const backupPath = `${fullPath}.backup`;
+          await fsPromises.copyFile(fullPath, backupPath);
+        }
+        await vscode.workspace.fs.delete(fileUri, { recursive: isDir, useTrash: false });
+      } else {
+        const { TrashManager } = await import('./trashManager');
+        const tm = new TrashManager(workspaceRoot);
+        await tm.moveToTrash(filePath);
+      }
       
       // Find files that included this file
       const affectedFiles = await this.findFilesIncluding(workspaceRoot, filePath);
