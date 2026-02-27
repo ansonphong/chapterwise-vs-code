@@ -1013,20 +1013,12 @@ export class CodexStructureEditor {
   }
   
   /**
-   * Build YAML path from PathSegment array
+   * Build YAML path from PathSegment array.
+   * node.path already contains 'children' segments from codexModel parsing,
+   * so this is a simple pass-through.
    */
   private buildYamlPath(pathSegments: PathSegment[]): PathSegment[] {
-    // Convert path segments to YAML document path
-    // e.g., [0, 'children', 1] -> ['children', 0, 'children', 1]
-    const yamlPath: PathSegment[] = [];
-    for (const segment of pathSegments) {
-      if (typeof segment === 'number') {
-        yamlPath.push(segment);
-      } else {
-        yamlPath.push('children', segment);
-      }
-    }
-    return yamlPath;
+    return [...pathSegments];
   }
   
   /**
