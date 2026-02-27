@@ -655,18 +655,35 @@ function registerCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'chapterwiseCodex.goToYaml',
-      async (treeItem?: CodexTreeItem) => {
-        if (!treeItem) {
+      async (treeItem?: CodexTreeItem | IndexNodeTreeItem | CodexFieldTreeItem) => {
+        if (!treeItem) return;
+
+        if (treeItem instanceof IndexNodeTreeItem) {
+          const wsRoot = getWorkspaceRoot();
+          if (!wsRoot) return;
+          const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+          if (!resolved) return;
+          const ed = await vscode.window.showTextDocument(resolved.doc);
+          if (resolved.node.lineNumber) {
+            const pos = new vscode.Position(resolved.node.lineNumber - 1, 0);
+            ed.selection = new vscode.Selection(pos, pos);
+            ed.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenter);
+          }
+          return;
+        }
+
+        if (treeItem instanceof CodexFieldTreeItem) {
+          const document = treeProvider.getActiveTextDocument();
+          if (document) {
+            await vscode.window.showTextDocument(document);
+          }
           return;
         }
 
         const document = treeProvider.getActiveTextDocument();
-        if (!document) {
-          return;
-        }
+        if (!document) return;
 
-        // Navigate to the node's line in the source file
-        const lineNumber = treeItem.codexNode.lineNumber;
+        const lineNumber = (treeItem as CodexTreeItem).codexNode.lineNumber;
         if (lineNumber !== undefined) {
           const editor = await vscode.window.showTextDocument(document);
           const position = new vscode.Position(lineNumber - 1, 0);
@@ -676,7 +693,6 @@ function registerCommands(context: vscode.ExtensionContext): void {
             vscode.TextEditorRevealType.InCenter
           );
         } else {
-          // Fallback: just open the document
           await vscode.window.showTextDocument(document);
         }
       }
@@ -687,15 +703,26 @@ function registerCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'chapterwiseCodex.copyId',
-      async (treeItem?: CodexTreeItem) => {
-        if (!treeItem || !treeItem.codexNode.id) {
+      async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+        if (!treeItem) {
           vscode.window.showInformationMessage('No ID to copy');
           return;
         }
 
-        await vscode.env.clipboard.writeText(treeItem.codexNode.id);
+        if (treeItem instanceof IndexNodeTreeItem) {
+          await vscode.env.clipboard.writeText(treeItem.indexNode.id);
+          vscode.window.setStatusBarMessage(`Copied ID: ${treeItem.indexNode.id}`, 3000);
+          return;
+        }
+
+        if (!(treeItem as CodexTreeItem).codexNode?.id) {
+          vscode.window.showInformationMessage('No ID to copy');
+          return;
+        }
+
+        await vscode.env.clipboard.writeText((treeItem as CodexTreeItem).codexNode.id);
         vscode.window.setStatusBarMessage(
-          `Copied: ${treeItem.codexNode.id}`,
+          `Copied: ${(treeItem as CodexTreeItem).codexNode.id}`,
           2000
         );
       }
@@ -1258,6 +1285,13 @@ function registerCommands(context: vscode.ExtensionContext): void {
     )
   );
 
+  // Backward-compat alias for renamed command (can remove in next major version)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.navigateToNodeInCodeView',
+      (...args: any[]) => vscode.commands.executeCommand('chapterwiseCodex.navigateToEntityInCodeView', ...args)
+    )
+  );
+
   // Navigate to Field in Code View (alternative to Writer View)
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -1434,9 +1468,32 @@ function registerCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'chapterwiseCodex.addChildNode',
-      async (treeItem?: CodexTreeItem) => {
+      async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) {
           vscode.window.showInformationMessage('Select a node to add a child to');
+          return;
+        }
+
+        if (treeItem instanceof IndexNodeTreeItem) {
+          const wsRoot = getWorkspaceRoot();
+          if (!wsRoot) return;
+          const nodeKind = (treeItem.indexNode as any)._node_kind;
+          if (nodeKind === 'folder') {
+            vscode.window.showInformationMessage('Use "Add File" for folders');
+            return;
+          }
+          const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+          if (!resolved) return;
+          const name = await vscode.window.showInputBox({ prompt: 'Enter node name' });
+          if (!name) return;
+          const type = await vscode.window.showInputBox({ prompt: 'Enter node type', value: 'scene' });
+          if (!type) return;
+          const { getStructureEditor } = await import('./structureEditor');
+          const { getSettingsManager } = await import('./settingsManager');
+          const editor = getStructureEditor();
+          const settings = await getSettingsManager().getSettings(resolved.doc.uri);
+          await editor.addNodeInDocument(resolved.doc, resolved.node, 'child', { name, type, proseField: 'body', proseValue: '' }, settings);
+          await reloadTreeIndex();
           return;
         }
 
@@ -1532,9 +1589,62 @@ function registerCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'chapterwiseCodex.addSiblingNode',
-      async (treeItem?: CodexTreeItem) => {
+      async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) {
           vscode.window.showInformationMessage('Select a node to add a sibling to');
+          return;
+        }
+
+        if (treeItem instanceof IndexNodeTreeItem) {
+          const wsRoot = getWorkspaceRoot();
+          if (!wsRoot) return;
+          const nodeKind = (treeItem.indexNode as any)._node_kind;
+
+          if (nodeKind === 'file') {
+            const name = await vscode.window.showInputBox({ prompt: 'Enter node name' });
+            if (!name) return;
+            if (/[/\\]/.test(name) || name === '..' || name === '.') {
+              vscode.window.showErrorMessage('Invalid node name');
+              return;
+            }
+            const type = await vscode.window.showInputBox({ prompt: 'Enter node type', value: treeItem.indexNode.type || 'chapter' });
+            if (!type) return;
+            const filePath = treeItem.indexNode._computed_path;
+            if (!filePath) return;
+            const dir = path.dirname(filePath);
+
+            const { getStructureEditor } = await import('./structureEditor');
+            const { getSettingsManager } = await import('./settingsManager');
+            const ed = getStructureEditor();
+            const settings = await getSettingsManager().getSettings(vscode.Uri.file(path.join(wsRoot, filePath)));
+            const slugName = (ed as any).slugifyName(name, settings.naming);
+            const newFilePath = path.join(dir, `${slugName}.codex.yaml`);
+            const newFullPath = path.join(wsRoot, newFilePath);
+
+            const { isPathWithinWorkspace } = await import('./writerView/utils/helpers');
+            if (!isPathWithinWorkspace(newFullPath, wsRoot)) {
+              vscode.window.showErrorMessage('File path resolves outside workspace');
+              return;
+            }
+
+            const { randomUUID } = await import('crypto');
+            const content = `metadata:\n  formatVersion: "1.2"\nid: "${randomUUID()}"\ntype: ${type}\nname: "${name}"\nbody: ""\n`;
+            await vscode.workspace.fs.writeFile(vscode.Uri.file(newFullPath), Buffer.from(content, 'utf-8'));
+            await regenerateAndReload(wsRoot);
+          } else if (nodeKind === 'node') {
+            const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+            if (!resolved) return;
+            const name = await vscode.window.showInputBox({ prompt: 'Enter node name' });
+            if (!name) return;
+            const type = await vscode.window.showInputBox({ prompt: 'Enter node type', value: treeItem.indexNode.type || 'scene' });
+            if (!type) return;
+            const { getStructureEditor } = await import('./structureEditor');
+            const { getSettingsManager } = await import('./settingsManager');
+            const ed = getStructureEditor();
+            const settings = await getSettingsManager().getSettings(resolved.doc.uri);
+            await ed.addNodeInDocument(resolved.doc, resolved.node, 'sibling-after', { name, type, proseField: 'body', proseValue: '' }, settings);
+            await reloadTreeIndex();
+          }
           return;
         }
 
@@ -1550,7 +1660,6 @@ function registerCommands(context: vscode.ExtensionContext): void {
         const editor = getStructureEditor();
         const settings = await getSettingsManager().getSettings(document.uri);
 
-        // Prompt for node data
         const name = await vscode.window.showInputBox({
           prompt: 'Enter node name',
           placeHolder: 'e.g., Scene 2, Chapter 3'
@@ -1560,16 +1669,15 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
         const type = await vscode.window.showInputBox({
           prompt: 'Enter node type',
-          value: treeItem.codexNode.type, // Default to same type as sibling
+          value: (treeItem as CodexTreeItem).codexNode.type,
           placeHolder: 'e.g., scene, chapter'
         });
 
         if (!type) return;
 
-        // Add as sibling after
         const success = await editor.addNodeInDocument(
           document,
-          treeItem.codexNode,
+          (treeItem as CodexTreeItem).codexNode,
           'sibling-after',
           { name, type, proseField: 'body', proseValue: '' },
           settings
@@ -1583,12 +1691,38 @@ function registerCommands(context: vscode.ExtensionContext): void {
     )
   );
 
-  // Remove node command
+  // Remove node command (move to trash)
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'chapterwiseCodex.removeNode',
-      async (treeItem?: CodexTreeItem) => {
+      async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) return;
+
+        if (treeItem instanceof IndexNodeTreeItem) {
+          const wsRoot = getWorkspaceRoot();
+          if (!wsRoot) return;
+          const nodeKind = (treeItem.indexNode as any)._node_kind;
+          if (nodeKind === 'file' || nodeKind === 'folder') {
+            const filePath = treeItem.indexNode._computed_path;
+            if (!filePath) return;
+            const { getStructureEditor } = await import('./structureEditor');
+            const { getSettingsManager } = await import('./settingsManager');
+            const editor = getStructureEditor();
+            const settings = await getSettingsManager().getSettings(vscode.Uri.file(path.join(wsRoot, filePath)));
+            await editor.removeFileFromIndex(wsRoot, filePath, false, settings);
+            await regenerateAndReload(wsRoot);
+          } else if (nodeKind === 'node') {
+            const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+            if (!resolved) return;
+            const { getStructureEditor } = await import('./structureEditor');
+            const { getSettingsManager } = await import('./settingsManager');
+            const editor = getStructureEditor();
+            const settings = await getSettingsManager().getSettings(resolved.doc.uri);
+            await editor.removeNodeFromDocument(resolved.doc, resolved.node, false, settings);
+            await reloadTreeIndex();
+          }
+          return;
+        }
 
         const document = treeProvider.getActiveTextDocument();
         if (!document) return;
@@ -1601,14 +1735,14 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
         const success = await editor.removeNodeFromDocument(
           document,
-          treeItem.codexNode,
+          (treeItem as CodexTreeItem).codexNode,
           false,
           settings
         );
 
         if (success) {
           treeProvider.setActiveDocument(document);
-          showTransientMessage(`✓ Removed: ${treeItem.codexNode.name}`, 3000);
+          showTransientMessage(`✓ Removed: ${(treeItem as CodexTreeItem).codexNode.name}`, 3000);
         }
       }
     )
@@ -1618,8 +1752,34 @@ function registerCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'chapterwiseCodex.deleteNodePermanently',
-      async (treeItem?: CodexTreeItem) => {
+      async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) return;
+
+        if (treeItem instanceof IndexNodeTreeItem) {
+          const wsRoot = getWorkspaceRoot();
+          if (!wsRoot) return;
+          const nodeKind = (treeItem.indexNode as any)._node_kind;
+          if (nodeKind === 'file' || nodeKind === 'folder') {
+            const filePath = treeItem.indexNode._computed_path;
+            if (!filePath) return;
+            const { getStructureEditor } = await import('./structureEditor');
+            const { getSettingsManager } = await import('./settingsManager');
+            const editor = getStructureEditor();
+            const settings = await getSettingsManager().getSettings(vscode.Uri.file(path.join(wsRoot, filePath)));
+            await editor.removeFileFromIndex(wsRoot, filePath, true, settings);
+            await regenerateAndReload(wsRoot);
+          } else if (nodeKind === 'node') {
+            const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+            if (!resolved) return;
+            const { getStructureEditor } = await import('./structureEditor');
+            const { getSettingsManager } = await import('./settingsManager');
+            const editor = getStructureEditor();
+            const settings = await getSettingsManager().getSettings(resolved.doc.uri);
+            await editor.removeNodeFromDocument(resolved.doc, resolved.node, true, settings);
+            await reloadTreeIndex();
+          }
+          return;
+        }
 
         const document = treeProvider.getActiveTextDocument();
         if (!document) return;
@@ -1632,14 +1792,14 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
         const success = await editor.removeNodeFromDocument(
           document,
-          treeItem.codexNode,
+          (treeItem as CodexTreeItem).codexNode,
           true,
           settings
         );
 
         if (success) {
           treeProvider.setActiveDocument(document);
-          showTransientMessage(`✓ Deleted: ${treeItem.codexNode.name}`, 3000);
+          showTransientMessage(`✓ Deleted: ${(treeItem as CodexTreeItem).codexNode.name}`, 3000);
         }
       }
     )
@@ -1649,16 +1809,44 @@ function registerCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'chapterwiseCodex.renameNode',
-      async (treeItem?: CodexTreeItem) => {
+      async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) return;
+
+        if (treeItem instanceof IndexNodeTreeItem) {
+          const wsRoot = getWorkspaceRoot();
+          if (!wsRoot) return;
+          const nodeKind = (treeItem.indexNode as any)._node_kind;
+          const currentName = treeItem.indexNode.name || treeItem.indexNode.title || '';
+          const newName = await vscode.window.showInputBox({ prompt: 'Enter new name', value: currentName });
+          if (!newName || newName === currentName) return;
+
+          if (nodeKind === 'file') {
+            const filePath = treeItem.indexNode._computed_path;
+            if (!filePath) return;
+            const { getStructureEditor } = await import('./structureEditor');
+            const { getSettingsManager } = await import('./settingsManager');
+            const editor = getStructureEditor();
+            const settings = await getSettingsManager().getSettings(vscode.Uri.file(path.join(wsRoot, filePath)));
+            await editor.renameFileInIndex(wsRoot, filePath, newName, settings);
+            await regenerateAndReload(wsRoot);
+          } else if (nodeKind === 'node') {
+            const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+            if (!resolved) return;
+            const { getStructureEditor } = await import('./structureEditor');
+            const editor = getStructureEditor();
+            await editor.renameNodeInDocument(resolved.doc, resolved.node, newName);
+            await reloadTreeIndex();
+          }
+          return;
+        }
 
         const newName = await vscode.window.showInputBox({
           prompt: 'Enter new name',
-          value: treeItem.codexNode.name,
+          value: (treeItem as CodexTreeItem).codexNode.name,
           placeHolder: 'New node name'
         });
 
-        if (!newName || newName === treeItem.codexNode.name) return;
+        if (!newName || newName === (treeItem as CodexTreeItem).codexNode.name) return;
 
         const document = treeProvider.getActiveTextDocument();
         if (!document) {
@@ -1671,7 +1859,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
         const success = await editor.renameNodeInDocument(
           document,
-          treeItem.codexNode,
+          (treeItem as CodexTreeItem).codexNode,
           newName
         );
 
@@ -1690,30 +1878,25 @@ function registerCommands(context: vscode.ExtensionContext): void {
       async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) return;
 
-        // Only works in INDEX mode with IndexNodeTreeItem
         if (!(treeItem instanceof IndexNodeTreeItem)) {
           vscode.window.showInformationMessage('Move up/down only works in Index mode');
           return;
         }
 
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-        if (!workspaceFolder) {
-          vscode.window.showErrorMessage('No workspace folder found');
-          return;
-        }
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
 
-        const workspaceRoot = workspaceFolder.uri.fsPath;
         const filePath = treeItem.getFilePath();
-        const relativePath = path.relative(workspaceRoot, filePath);
+        const relativePath = path.relative(wsRoot, filePath);
 
         const { getStructureEditor } = await import('./structureEditor');
         const editor = getStructureEditor();
 
-        const result = await editor.moveFileUp(workspaceRoot, relativePath);
+        const result = await editor.moveFileUp(wsRoot, relativePath);
 
         if (result.success) {
           showTransientMessage(result.message || '✓ Moved up', 3000);
-          treeProvider.refresh();
+          await reloadTreeIndex();
         } else {
           vscode.window.showWarningMessage(result.message || 'Failed to move up');
         }
@@ -1728,30 +1911,25 @@ function registerCommands(context: vscode.ExtensionContext): void {
       async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) return;
 
-        // Only works in INDEX mode with IndexNodeTreeItem
         if (!(treeItem instanceof IndexNodeTreeItem)) {
           vscode.window.showInformationMessage('Move up/down only works in Index mode');
           return;
         }
 
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-        if (!workspaceFolder) {
-          vscode.window.showErrorMessage('No workspace folder found');
-          return;
-        }
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
 
-        const workspaceRoot = workspaceFolder.uri.fsPath;
         const filePath = treeItem.getFilePath();
-        const relativePath = path.relative(workspaceRoot, filePath);
+        const relativePath = path.relative(wsRoot, filePath);
 
         const { getStructureEditor } = await import('./structureEditor');
         const editor = getStructureEditor();
 
-        const result = await editor.moveFileDown(workspaceRoot, relativePath);
+        const result = await editor.moveFileDown(wsRoot, relativePath);
 
         if (result.success) {
           showTransientMessage(result.message || '✓ Moved down', 3000);
-          treeProvider.refresh();
+          await reloadTreeIndex();
         } else {
           vscode.window.showWarningMessage(result.message || 'Failed to move down');
         }
