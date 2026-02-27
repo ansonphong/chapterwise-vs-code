@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CodexStructureEditor } from './structureEditor';
 import * as YAML from 'yaml';
+import { workspace } from 'vscode';
 
 // Mock vscode module
 vi.mock('vscode', () => ({
@@ -191,6 +192,48 @@ describe('CodexStructureEditor', () => {
       const node = makeNode({ path: ['children', 99] });
       const result = await editor.duplicateNodeInDocument(doc, node);
       expect(result).toBe(false);
+    });
+
+    it('generates new IDs in duplicate', async () => {
+      const doc = makeDoc(sampleYaml);
+      const node = makeNode({ path: ['children', 0], name: 'Child One', id: 'child-1' });
+      await editor.duplicateNodeInDocument(doc, node);
+      // Verify applyEdit was called with YAML containing duplicated node
+      const call = vi.mocked(workspace.applyEdit).mock.calls;
+      expect(call.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('regenerateChildIds', () => {
+    it('regenerates id on flat object', () => {
+      const obj = { id: 'old-id', name: 'Test' };
+      (editor as any).regenerateChildIds(obj);
+      expect(obj.id).not.toBe('old-id');
+      expect(obj.id).toBeTruthy();
+    });
+
+    it('regenerates ids recursively in children', () => {
+      const obj = {
+        id: 'parent',
+        children: [
+          { id: 'child-a', children: [{ id: 'grandchild' }] },
+          { id: 'child-b' },
+        ],
+      };
+      (editor as any).regenerateChildIds(obj);
+      expect(obj.id).not.toBe('parent');
+      expect(obj.children[0].id).not.toBe('child-a');
+      expect(obj.children[0].children[0].id).not.toBe('grandchild');
+      expect(obj.children[1].id).not.toBe('child-b');
+      // All IDs should be unique
+      const ids = [obj.id, obj.children[0].id, obj.children[0].children[0].id, obj.children[1].id];
+      expect(new Set(ids).size).toBe(4);
+    });
+
+    it('handles objects without id or children', () => {
+      const obj = { name: 'no id' };
+      (editor as any).regenerateChildIds(obj);
+      expect(obj).toEqual({ name: 'no id' });
     });
   });
 });

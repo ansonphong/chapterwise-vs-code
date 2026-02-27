@@ -1254,8 +1254,7 @@ export class CodexStructureEditor {
     yamlDoc.setIn(fieldPath, '');
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    await vscode.workspace.applyEdit(edit);
-    return true;
+    return vscode.workspace.applyEdit(edit);
   }
 
   /**
@@ -1273,8 +1272,7 @@ export class CodexStructureEditor {
     yamlDoc.deleteIn(fieldPath);
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    await vscode.workspace.applyEdit(edit);
-    return true;
+    return vscode.workspace.applyEdit(edit);
   }
 
   /**
@@ -1294,8 +1292,7 @@ export class CodexStructureEditor {
     yamlDoc.setIn([...yamlPath, newName], value);
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    await vscode.workspace.applyEdit(edit);
-    return true;
+    return vscode.workspace.applyEdit(edit);
   }
 
   /**
@@ -1307,8 +1304,7 @@ export class CodexStructureEditor {
     yamlDoc.setIn([...yamlPath, 'type'], newType);
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    await vscode.workspace.applyEdit(edit);
-    return true;
+    return vscode.workspace.applyEdit(edit);
   }
 
   /**
@@ -1326,8 +1322,7 @@ export class CodexStructureEditor {
     yamlDoc.setIn(tagsPath, merged);
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    await vscode.workspace.applyEdit(edit);
-    return true;
+    return vscode.workspace.applyEdit(edit);
   }
 
   /**
@@ -1339,14 +1334,13 @@ export class CodexStructureEditor {
     const relationsPath = [...yamlPath, 'relations'];
 
     const existing = yamlDoc.getIn(relationsPath);
-    const relations: any[] = Array.isArray(existing) ? existing : [];
+    const relations: Array<{ targetId: string; type: string }> = Array.isArray(existing) ? existing : [];
     relations.push({ targetId, type: relationType });
 
     yamlDoc.setIn(relationsPath, relations);
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    await vscode.workspace.applyEdit(edit);
-    return true;
+    return vscode.workspace.applyEdit(edit);
   }
 
   /**
@@ -1358,8 +1352,7 @@ export class CodexStructureEditor {
     yamlDoc.setIn([...yamlPath, 'emoji'], emoji);
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    await vscode.workspace.applyEdit(edit);
-    return true;
+    return vscode.workspace.applyEdit(edit);
   }
 
   // ============================================================================
@@ -1408,8 +1401,7 @@ export class CodexStructureEditor {
 
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    await vscode.workspace.applyEdit(edit);
-    return true;
+    return vscode.workspace.applyEdit(edit);
   }
 
   /**
@@ -1449,8 +1441,7 @@ export class CodexStructureEditor {
 
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    await vscode.workspace.applyEdit(edit);
-    return true;
+    return vscode.workspace.applyEdit(edit);
   }
 
   /**
@@ -1459,7 +1450,7 @@ export class CodexStructureEditor {
   private regenerateChildIds(obj: any): void {
     if (obj && typeof obj === 'object') {
       if (obj.id) {
-        obj.id = crypto.randomUUID();
+        obj.id = this.generateUuid();
       }
       if (Array.isArray(obj.children)) {
         for (const child of obj.children) {
