@@ -27,8 +27,10 @@ export interface OrderIndex {
  */
 export class OrderingManager {
   private indexPath: string;
+  readonly wsRoot: string;
 
   constructor(private workspaceRoot: string) {
+    this.wsRoot = workspaceRoot;
     this.indexPath = path.join(workspaceRoot, 'index.codex.yaml');
   }
 
@@ -184,7 +186,7 @@ export class OrderingManager {
       return index.children;
     }
 
-    const segments = folderPath.split(path.sep).filter(Boolean);
+    const segments = folderPath.split(/[/\\]/).filter(Boolean);
     let current = index.children;
 
     for (const segment of segments) {
@@ -304,7 +306,7 @@ export class OrderingManager {
 let instance: OrderingManager | null = null;
 
 export function getOrderingManager(workspaceRoot: string): OrderingManager {
-  if (!instance || (instance as any).workspaceRoot !== workspaceRoot) {
+  if (!instance || instance.wsRoot !== workspaceRoot) {
     instance = new OrderingManager(workspaceRoot);
   }
   return instance;

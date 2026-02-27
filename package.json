@@ -172,11 +172,6 @@
         "icon": "$(list-tree)"
       },
       {
-        "command": "chapterwiseCodex.autofixFolder",
-        "title": "Autofix Folder",
-        "icon": "$(wand)"
-      },
-      {
         "command": "chapterwiseCodex.setContextFolder",
         "title": "Set as Codex Context Folder",
         "icon": "$(folder-active)"
@@ -406,11 +401,6 @@
           "command": "chapterwiseCodex.deleteNodePermanently",
           "when": "view == chapterwiseCodexNavigator && viewItem == codexNode",
           "group": "5_delete@2"
-        },
-        {
-          "command": "chapterwiseCodex.autofixFolder",
-          "when": "view == chapterwiseCodexNavigator && viewItem == indexFolder",
-          "group": "2_edit@3"
         },
         {
           "command": "chapterwiseCodex.navigateToNode",

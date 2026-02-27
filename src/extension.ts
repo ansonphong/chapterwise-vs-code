@@ -1802,7 +1802,8 @@ function registerCommands(context: vscode.ExtensionContext): void {
   );
 
 
-  // Autofix Folder command (renormalize order values)
+  // Autofix Folder command (run CodexAutoFixer on all files in folder)
+  // Note: Order renormalization removed — ordering now managed by index.codex.yaml array position
   context.subscriptions.push(
     vscode.commands.registerCommand('chapterwiseCodex.autofixFolder', async (item: any) => {
       if (!item || !item.indexNode) {
@@ -1810,77 +1811,39 @@ function registerCommands(context: vscode.ExtensionContext): void {
         return;
       }
 
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders || workspaceFolders.length === 0) {
+      const wsRoot = getWorkspaceRoot();
+      if (!wsRoot) {
         vscode.window.showErrorMessage('No workspace folder found');
         return;
       }
 
-      const workspaceRoot = workspaceFolders[0].uri.fsPath;
       const folderPath = item.indexNode._computed_path || item.indexNode.name;
-
-      outputChannel.appendLine('='.repeat(80));
-      outputChannel.appendLine(`[autofixFolder] Starting autofix for folder`);
-      outputChannel.appendLine(`  Workspace root: ${workspaceRoot}`);
-      outputChannel.appendLine(`  Folder path: ${folderPath}`);
-      outputChannel.appendLine(`  Index node name: ${item.indexNode.name}`);
-      outputChannel.appendLine(`  Index node type: ${item.indexNode.type}`);
-      outputChannel.appendLine(`  _computed_path: ${item.indexNode._computed_path}`);
-      outputChannel.appendLine(`  _filename: ${item.indexNode._filename}`);
 
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         title: `Autofixing folder: ${item.indexNode.name}...`,
         cancellable: false,
       }, async (progress) => {
-        const { getStructureEditor } = await import('./structureEditor');
         const { CodexAutoFixer } = await import('./autoFixer');
-        const editor = getStructureEditor();
 
-        // 1. Renormalize order values in the index
-        progress.report({ message: 'Renormalizing order values...', increment: 10 });
-        outputChannel.appendLine(`[autofixFolder] Step 1: Renormalizing order values...`);
-
-        const result = await editor.autofixFolderOrder(workspaceRoot, folderPath);
-
-        outputChannel.appendLine(`[autofixFolder] Result: ${JSON.stringify(result, null, 2)}`);
-
-        if (!result.success) {
-          outputChannel.appendLine(`[autofixFolder] FAILED: ${result.message}`);
-          vscode.window.showErrorMessage(`Autofix failed: ${result.message}`);
-          return;
-        }
-
-        outputChannel.appendLine(`[autofixFolder] SUCCESS: ${result.message}`);
-
-        // 2. Run autofix on all .codex.yaml files in folder
         progress.report({ message: 'Finding Codex files...', increment: 10 });
-        outputChannel.appendLine(`[autofixFolder] Step 2: Running autofix on all .codex.yaml files...`);
 
-        const folderFullPath = path.join(workspaceRoot, folderPath);
-        outputChannel.appendLine(`[autofixFolder] Scanning folder: ${folderFullPath}`);
-
+        const folderFullPath = path.join(wsRoot, folderPath);
         if (!fs.existsSync(folderFullPath)) {
-          outputChannel.appendLine(`[autofixFolder] WARNING: Folder does not exist: ${folderFullPath}`);
           vscode.window.showWarningMessage(`Folder not found: ${folderPath}`);
           return;
         }
 
-        // Find all .codex.yaml files in the folder (not recursive)
         const files = fs.readdirSync(folderFullPath)
           .filter(file => file.endsWith('.codex.yaml'))
           .map(file => path.join(folderFullPath, file));
 
-        outputChannel.appendLine(`[autofixFolder] Found ${files.length} .codex.yaml files`);
-
         if (files.length === 0) {
-          outputChannel.appendLine(`[autofixFolder] No .codex.yaml files found in folder`);
           treeProvider.refresh();
-          showTransientMessage(`✅ Autofix complete: ${result.message} (no files to fix)`, 4000);
+          showTransientMessage(`Autofix complete: no .codex.yaml files found`, 4000);
           return;
         }
 
-        // Auto-fix each file
         const fixer = new CodexAutoFixer();
         let fixedCount = 0;
         let totalFixes = 0;
@@ -1888,59 +1851,26 @@ function registerCommands(context: vscode.ExtensionContext): void {
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
           const fileName = path.basename(file);
-
-          progress.report({
-            message: `Fixing ${fileName} (${i + 1}/${files.length})...`,
-            increment: 70 / files.length
-          });
-
-          outputChannel.appendLine(`[autofixFolder] Processing: ${fileName}`);
+          progress.report({ message: `Fixing ${fileName} (${i + 1}/${files.length})...`, increment: 80 / files.length });
 
           try {
-            // Read file
             const content = fs.readFileSync(file, 'utf-8');
-
-            // Run autofix
             const fixResult = fixer.autoFixCodex(content, false);
-
             if (fixResult.success && fixResult.fixesApplied.length > 0) {
-              // Write fixed content back
               fs.writeFileSync(file, fixResult.fixedText, 'utf-8');
-
-              outputChannel.appendLine(`[autofixFolder]   ✓ ${fileName}: Applied ${fixResult.fixesApplied.length} fixes`);
-              fixResult.fixesApplied.forEach(fix => {
-                outputChannel.appendLine(`[autofixFolder]     - ${fix}`);
-              });
-
               fixedCount++;
               totalFixes += fixResult.fixesApplied.length;
-            } else if (fixResult.success) {
-              outputChannel.appendLine(`[autofixFolder]   ✓ ${fileName}: No fixes needed`);
-            } else {
-              outputChannel.appendLine(`[autofixFolder]   ✗ ${fileName}: Error - ${fixResult.error}`);
             }
           } catch (error) {
-            outputChannel.appendLine(`[autofixFolder]   ✗ ${fileName}: Exception - ${error}`);
+            outputChannel.appendLine(`[autofixFolder] ${fileName}: Exception - ${error}`);
           }
         }
 
-        progress.report({ message: 'Refreshing tree...', increment: 10 });
-
-        // 3. Refresh tree
         treeProvider.refresh();
-
-        // Show success message with summary
-        const summary = `✅ Autofix complete for "${item.indexNode.name}":\n` +
-                       `• ${result.message}\n` +
-                       `• Fixed ${fixedCount}/${files.length} files (${totalFixes} total fixes)`;
-
-        outputChannel.appendLine(`[autofixFolder] Complete: ${fixedCount}/${files.length} files fixed, ${totalFixes} total fixes`);
-
-        vscode.window.showInformationMessage(summary);
+        vscode.window.showInformationMessage(
+          `Autofix complete for "${item.indexNode.name}": Fixed ${fixedCount}/${files.length} files (${totalFixes} total fixes)`
+        );
       });
-
-      outputChannel.appendLine(`[autofixFolder] Complete`);
-      outputChannel.appendLine('='.repeat(80));
     })
   );
 
