@@ -1232,6 +1232,242 @@ export class CodexStructureEditor {
 
     return search(children);
   }
+
+  // ============================================================================
+  // Field Operations (Stage 3)
+  // ============================================================================
+
+  /**
+   * Add a field to a node (e.g., synopsis, notes)
+   */
+  async addFieldToNode(doc: vscode.TextDocument, node: CodexNode, fieldName: string): Promise<boolean> {
+    const yamlDoc = YAML.parseDocument(doc.getText());
+    const yamlPath = this.buildYamlPath(node.path);
+    const fieldPath = [...yamlPath, fieldName];
+
+    // Check if field already exists
+    const existing = yamlDoc.getIn(fieldPath);
+    if (existing !== undefined && existing !== null) {
+      return false;
+    }
+
+    yamlDoc.setIn(fieldPath, '');
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
+    await vscode.workspace.applyEdit(edit);
+    return true;
+  }
+
+  /**
+   * Remove a field from a node
+   */
+  async removeFieldFromNode(doc: vscode.TextDocument, node: CodexNode, fieldName: string): Promise<boolean> {
+    const yamlDoc = YAML.parseDocument(doc.getText());
+    const yamlPath = this.buildYamlPath(node.path);
+    const fieldPath = [...yamlPath, fieldName];
+
+    if (yamlDoc.getIn(fieldPath) === undefined) {
+      return false;
+    }
+
+    yamlDoc.deleteIn(fieldPath);
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
+    await vscode.workspace.applyEdit(edit);
+    return true;
+  }
+
+  /**
+   * Rename a field on a node
+   */
+  async renameFieldOnNode(doc: vscode.TextDocument, node: CodexNode, oldName: string, newName: string): Promise<boolean> {
+    const yamlDoc = YAML.parseDocument(doc.getText());
+    const yamlPath = this.buildYamlPath(node.path);
+    const oldPath = [...yamlPath, oldName];
+
+    const value = yamlDoc.getIn(oldPath);
+    if (value === undefined) {
+      return false;
+    }
+
+    yamlDoc.deleteIn(oldPath);
+    yamlDoc.setIn([...yamlPath, newName], value);
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
+    await vscode.workspace.applyEdit(edit);
+    return true;
+  }
+
+  /**
+   * Change a node's type
+   */
+  async changeNodeType(doc: vscode.TextDocument, node: CodexNode, newType: string): Promise<boolean> {
+    const yamlDoc = YAML.parseDocument(doc.getText());
+    const yamlPath = this.buildYamlPath(node.path);
+    yamlDoc.setIn([...yamlPath, 'type'], newType);
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
+    await vscode.workspace.applyEdit(edit);
+    return true;
+  }
+
+  /**
+   * Add tags to a node, deduplicating
+   */
+  async addTagsToNode(doc: vscode.TextDocument, node: CodexNode, tags: string[]): Promise<boolean> {
+    const yamlDoc = YAML.parseDocument(doc.getText());
+    const yamlPath = this.buildYamlPath(node.path);
+    const tagsPath = [...yamlPath, 'tags'];
+
+    const existing = yamlDoc.getIn(tagsPath);
+    const existingTags: string[] = Array.isArray(existing) ? existing : [];
+    const merged = [...new Set([...existingTags, ...tags])];
+
+    yamlDoc.setIn(tagsPath, merged);
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
+    await vscode.workspace.applyEdit(edit);
+    return true;
+  }
+
+  /**
+   * Add a relation to a node
+   */
+  async addRelationToNode(doc: vscode.TextDocument, node: CodexNode, targetId: string, relationType: string): Promise<boolean> {
+    const yamlDoc = YAML.parseDocument(doc.getText());
+    const yamlPath = this.buildYamlPath(node.path);
+    const relationsPath = [...yamlPath, 'relations'];
+
+    const existing = yamlDoc.getIn(relationsPath);
+    const relations: any[] = Array.isArray(existing) ? existing : [];
+    relations.push({ targetId, type: relationType });
+
+    yamlDoc.setIn(relationsPath, relations);
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
+    await vscode.workspace.applyEdit(edit);
+    return true;
+  }
+
+  /**
+   * Set emoji on a node
+   */
+  async setEmojiOnNode(doc: vscode.TextDocument, node: CodexNode, emoji: string): Promise<boolean> {
+    const yamlDoc = YAML.parseDocument(doc.getText());
+    const yamlPath = this.buildYamlPath(node.path);
+    yamlDoc.setIn([...yamlPath, 'emoji'], emoji);
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
+    await vscode.workspace.applyEdit(edit);
+    return true;
+  }
+
+  // ============================================================================
+  // Duplicate + Extract (Stage 3, Task 4)
+  // ============================================================================
+
+  /**
+   * Duplicate a node in the same document (creates sibling copy with new IDs)
+   */
+  async duplicateNodeInDocument(doc: vscode.TextDocument, node: CodexNode): Promise<boolean> {
+    const yamlDoc = YAML.parseDocument(doc.getText());
+    const yamlPath = this.buildYamlPath(node.path);
+    const nodeValue = yamlDoc.getIn(yamlPath);
+
+    if (!nodeValue || typeof nodeValue !== 'object') {
+      return false;
+    }
+
+    // Deep clone
+    const clone = JSON.parse(JSON.stringify(nodeValue));
+
+    // Regenerate all IDs recursively
+    this.regenerateChildIds(clone);
+
+    // Rename with "(copy)" suffix
+    if (clone.name) {
+      clone.name = `${clone.name} (copy)`;
+    }
+
+    // Find parent children array path and insert after current node
+    const currentIndex = yamlPath[yamlPath.length - 1] as number;
+    const parentPath = yamlPath.slice(0, -1); // e.g. ['children'] for top-level children
+
+    // Verify parent is a YAML sequence (YAMLSeq)
+    const parentSeq = parentPath.length > 0
+      ? yamlDoc.getIn(parentPath, true)
+      : yamlDoc.get('children', true);
+
+    if (!parentSeq || !YAML.isSeq(parentSeq)) {
+      return false;
+    }
+
+    // Insert clone after current node
+    const cloneNode = yamlDoc.createNode(clone);
+    parentSeq.items.splice(currentIndex + 1, 0, cloneNode as any);
+
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
+    await vscode.workspace.applyEdit(edit);
+    return true;
+  }
+
+  /**
+   * Extract a node to its own file, replacing with an includePath directive
+   */
+  async extractNodeToFile(
+    doc: vscode.TextDocument,
+    node: CodexNode,
+    workspaceRoot: string,
+    settings: NavigatorSettings
+  ): Promise<boolean> {
+    const yamlDoc = YAML.parseDocument(doc.getText());
+    const yamlPath = this.buildYamlPath(node.path);
+    const nodeValue = yamlDoc.getIn(yamlPath);
+
+    if (!nodeValue || typeof nodeValue !== 'object') {
+      return false;
+    }
+
+    // Create filename from node name
+    const slugName = this.slugifyName(node.name || 'extracted', settings.naming);
+    const docDir = path.dirname(doc.uri.fsPath);
+    const newFilePath = path.join(docDir, `${slugName}.codex.yaml`);
+
+    // Validate path within workspace
+    if (!isPathWithinRoot(newFilePath, workspaceRoot)) {
+      return false;
+    }
+
+    // Write the node content to new file
+    const nodeDoc = new YAML.Document(nodeValue);
+    await fsPromises.writeFile(newFilePath, nodeDoc.toString(), 'utf-8');
+
+    // Replace node with includePath directive (Fact #34)
+    const relativePath = `./${slugName}.codex.yaml`;
+    yamlDoc.setIn(yamlPath, { includePath: relativePath });
+
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
+    await vscode.workspace.applyEdit(edit);
+    return true;
+  }
+
+  /**
+   * Recursively regenerate all id fields in a cloned node tree
+   */
+  private regenerateChildIds(obj: any): void {
+    if (obj && typeof obj === 'object') {
+      if (obj.id) {
+        obj.id = crypto.randomUUID();
+      }
+      if (Array.isArray(obj.children)) {
+        for (const child of obj.children) {
+          this.regenerateChildIds(child);
+        }
+      }
+    }
+  }
 }
 
 /**
