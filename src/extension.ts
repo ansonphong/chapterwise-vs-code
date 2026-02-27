@@ -313,7 +313,8 @@ export function activate(context: vscode.ExtensionContext): void {
       masterTreeProvider = new MasterIndexTreeProvider();
       const masterView = vscode.window.createTreeView('chapterwiseCodexMaster', {
         treeDataProvider: masterTreeProvider,
-        showCollapseAll: true
+        showCollapseAll: true,
+        canSelectMany: true
       });
       context.subscriptions.push(masterView);
 
@@ -324,7 +325,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
         const view = vscode.window.createTreeView(`chapterwiseCodexIndex${i}`, {
           treeDataProvider: provider,
-          showCollapseAll: true
+          showCollapseAll: true,
+          canSelectMany: true
         });
         subIndexViews.push(view);
         context.subscriptions.push(view);
@@ -2231,6 +2233,10 @@ function registerCommands(context: vscode.ExtensionContext): void {
       const { ClipboardManager } = await import('./clipboardManager');
       clipboardManager = new ClipboardManager();
       context.subscriptions.push(clipboardManager);
+      treeProvider.setIsCutFn(
+        (nodeId: string) => clipboardManager.isCut(nodeId),
+        clipboardManager.onDidChange
+      );
     }
     return clipboardManager;
   };
@@ -2458,49 +2464,126 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
   // Batch move to trash (multi-select)
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.batchMoveToTrash', async (...args: any[]) => {
-      const items = args.length > 1 ? args[1] : args[0];
-      if (!Array.isArray(items) || items.length === 0) return;
-      const wsRoot = getWorkspaceRoot();
-      if (!wsRoot) return;
-      const { getStructureEditor } = await import('./structureEditor');
-      const { getSettingsManager } = await import('./settingsManager');
-      const editor = getStructureEditor();
-      for (const item of items) {
-        if (item instanceof IndexNodeTreeItem) {
-          const nodeKind = (item.indexNode as any)._node_kind;
-          if (nodeKind === 'file' || nodeKind === 'folder') {
-            const filePath = item.indexNode._computed_path;
-            if (!filePath) continue;
-            const settings = await getSettingsManager().getSettings(vscode.Uri.file(path.join(wsRoot, filePath)));
-            await editor.removeFileFromIndex(wsRoot, filePath, false, settings);
-          }
+    vscode.commands.registerCommand('chapterwiseCodex.batchMoveToTrash',
+      async (item: CodexTreeItem | IndexNodeTreeItem, selectedItems: (CodexTreeItem | IndexNodeTreeItem)[]) => {
+        const items = selectedItems || [item];
+        const confirm = await vscode.window.showWarningMessage(
+          `Move ${items.length} items to trash?`, { modal: true }, 'Move to Trash'
+        );
+        if (confirm !== 'Move to Trash') return;
+        for (const ti of items) {
+          await vscode.commands.executeCommand('chapterwiseCodex.moveToTrash', ti);
         }
       }
-      await regenerateAndReload(wsRoot);
-    })
+    )
   );
 
   // Batch add tags (multi-select)
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.batchAddTags', async (...args: any[]) => {
-      const items = args.length > 1 ? args[1] : args[0];
-      if (!Array.isArray(items) || items.length === 0) return;
-      const input = await vscode.window.showInputBox({ prompt: 'Enter tags (comma-separated)', placeHolder: 'e.g., action, drama' });
-      if (!input) return;
-      const tags = input.split(',').map(t => t.trim()).filter(Boolean);
-      if (tags.length === 0) return;
+    vscode.commands.registerCommand('chapterwiseCodex.batchAddTags',
+      async (item: CodexTreeItem | IndexNodeTreeItem, selectedItems: (CodexTreeItem | IndexNodeTreeItem)[]) => {
+        const items = selectedItems || [item];
+        const input = await vscode.window.showInputBox({ prompt: `Add tags to ${items.length} items (comma-separated)` });
+        if (!input) return;
+        const tags = input.split(',').map(t => t.trim()).filter(Boolean);
+        if (tags.length === 0) return;
+        const wsRoot = getWorkspaceRoot();
+        const { getStructureEditor } = await import('./structureEditor');
+        const editor = getStructureEditor();
+        for (const ti of items) {
+          if (ti instanceof CodexTreeItem) {
+            const doc = await vscode.workspace.openTextDocument(ti.documentUri);
+            await editor.addTagsToNode(doc, ti.codexNode, tags);
+          } else if (ti instanceof IndexNodeTreeItem) {
+            if (!wsRoot) continue;
+            const resolved = await resolveIndexNodeForEdit(ti, wsRoot);
+            if (resolved) await editor.addTagsToNode(resolved.doc, resolved.node, tags);
+          }
+        }
+        await reloadTreeIndex();
+      }
+    )
+  );
+
+  // Inline This File (reverse of extractToFile)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.inlineThisFile', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      let doc: vscode.TextDocument;
+      let node: any;
+
+      if (treeItem instanceof CodexTreeItem) {
+        if (!(treeItem.codexNode as any).includePath) {
+          vscode.window.showInformationMessage('This node is not an include reference');
+          return;
+        }
+        doc = await vscode.workspace.openTextDocument(treeItem.documentUri);
+        node = treeItem.codexNode;
+      } else if (treeItem instanceof IndexNodeTreeItem) {
+        const wsRoot = getWorkspaceRoot();
+        if (!wsRoot) return;
+        const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
+        if (!resolved || !(resolved.node as any).includePath) {
+          vscode.window.showInformationMessage('This node is not an include reference');
+          return;
+        }
+        doc = resolved.doc;
+        node = resolved.node;
+      } else {
+        return;
+      }
+
       const wsRoot = getWorkspaceRoot();
       if (!wsRoot) return;
+
+      const choice = await vscode.window.showQuickPick(
+        [
+          { label: 'Keep original file', value: false },
+          { label: 'Delete original file', value: true },
+        ],
+        { placeHolder: 'What to do with the original file?' }
+      );
+      if (!choice) return;
+
       const { getStructureEditor } = await import('./structureEditor');
       const editor = getStructureEditor();
-      for (const item of items) {
-        if (item instanceof IndexNodeTreeItem) {
-          const resolved = await resolveIndexNodeForEdit(item, wsRoot);
-          if (resolved) await editor.addTagsToNode(resolved.doc, resolved.node, tags);
+      const result = await editor.inlineThisFile(doc, node, wsRoot, choice.value);
+      if (result) {
+        if (choice.value) {
+          await regenerateAndReload(wsRoot);
+        } else {
+          await reloadTreeIndex();
         }
       }
-      await reloadTreeIndex();
+    })
+  );
+
+  // Add child folder (subfolder)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chapterwiseCodex.addChildFolder', async (treeItem?: IndexNodeTreeItem) => {
+      if (!treeItem) return;
+      const nodeKind = (treeItem.indexNode as any)._node_kind;
+      if (nodeKind !== 'folder') return;
+      const folderName = await vscode.window.showInputBox({ prompt: 'Enter subfolder name' });
+      if (!folderName) return;
+      if (/[/\\]/.test(folderName) || folderName === '..' || folderName === '.') {
+        vscode.window.showErrorMessage('Invalid folder name');
+        return;
+      }
+      const wsRoot = getWorkspaceRoot();
+      if (!wsRoot) return;
+      const parentPath = treeItem.indexNode._computed_path || '';
+      const newFolderPath = path.join(wsRoot, parentPath, folderName);
+      const { isPathWithinWorkspace } = await import('./writerView/utils/helpers');
+      if (!isPathWithinWorkspace(newFolderPath, wsRoot)) {
+        vscode.window.showErrorMessage('Folder path resolves outside workspace');
+        return;
+      }
+      await vscode.workspace.fs.createDirectory(vscode.Uri.file(newFolderPath));
+      const { getOrderingManager } = await import('./orderingManager');
+      const om = getOrderingManager(wsRoot);
+      await om.addEntry(parentPath, { name: folderName, type: 'folder', children: [] });
+      await regenerateAndReload(wsRoot);
     })
   );
 

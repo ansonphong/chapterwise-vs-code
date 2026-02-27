@@ -529,6 +529,11 @@
           "group": "4_navigate@4"
         },
         {
+          "command": "chapterwiseCodex.inlineThisFile",
+          "when": "viewItem == codexNode",
+          "group": "4_navigate@5"
+        },
+        {
           "command": "chapterwiseCodex.moveToTrash",
           "when": "viewItem == codexNode",
           "group": "5_delete@1"

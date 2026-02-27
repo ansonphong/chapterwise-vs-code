@@ -627,6 +627,18 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
   };
 
   private disposables: vscode.Disposable[] = [];
+  private _isCutFn: ((nodeId: string) => boolean) | null = null;
+
+  /** Set a function to check if a node is cut (for clipboard indicator) */
+  setIsCutFn(fn: (nodeId: string) => boolean, onChange: vscode.Event<void>): void {
+    this._isCutFn = fn;
+    this.disposables.push(onChange(() => this.refresh()));
+  }
+
+  /** Check if a node is currently cut */
+  isNodeCut(nodeId: string): boolean {
+    return this._isCutFn?.(nodeId) ?? false;
+  }
 
   /**
    * CENTRALIZED CONTEXT CHANGE METHOD
@@ -1320,7 +1332,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
     const hasChildren = node.children && node.children.length > 0;
 
     // Pass the centralized path resolver
-    return new IndexNodeTreeItem(
+    const treeItem = new IndexNodeTreeItem(
       node,
       workspaceRoot,
       documentUri,
@@ -1328,6 +1340,11 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
       !!hasChildren,
       (computedPath: string) => this.resolveFilePath(computedPath)
     );
+    // Add cut indicator if node is in clipboard
+    if (node.id && this.isNodeCut(node.id)) {
+      treeItem.description = `${treeItem.description || ''} (cut)`.trim();
+    }
+    return treeItem;
   }
 
   /**

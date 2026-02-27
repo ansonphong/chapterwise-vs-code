@@ -1459,6 +1459,41 @@ export class CodexStructureEditor {
       }
     }
   }
+
+  /**
+   * Inline an included file back into the parent document
+   */
+  async inlineThisFile(
+    document: vscode.TextDocument,
+    includeNode: CodexNode,
+    workspaceRoot: string,
+    deleteOriginal: boolean = false
+  ): Promise<boolean> {
+    const targetPath = (includeNode as any).includePath;
+    if (!targetPath) return false;
+
+    const fullPath = path.resolve(path.dirname(document.uri.fsPath), targetPath);
+    if (!isPathWithinRoot(fullPath, workspaceRoot)) {
+      throw new Error(`Include path resolves outside workspace: ${targetPath}`);
+    }
+
+    const targetDoc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));
+    const targetYaml = YAML.parseDocument(targetDoc.getText());
+    const parentYaml = YAML.parseDocument(document.getText());
+    const nodePath = this.buildYamlPath(includeNode.path);
+    parentYaml.setIn(nodePath, targetYaml.toJS());
+
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), parentYaml.toString());
+    const success = await vscode.workspace.applyEdit(edit);
+    if (!success) return false;
+
+    await document.save();
+    if (deleteOriginal) {
+      await vscode.workspace.fs.delete(vscode.Uri.file(fullPath), { useTrash: false });
+    }
+    return true;
+  }
 }
 
 /**
