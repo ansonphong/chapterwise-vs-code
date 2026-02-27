@@ -117,7 +117,17 @@ Singleton: `getOrderingManager(workspaceRoot)` / `disposeOrderingManager()`.
 
 **IMPORTANT (Fact #25, R3-8):** `scanDirectory()` must check `.codex.yaml`, `.codex.json`, AND `.md` files. `syncFolder()` auto-discovery must also check all three extensions, not just `.codex.yaml`.
 
-Full implementation in original plan file — copy verbatim.
+**Implementation details:** The `OrderingManager` class must be fully implemented inline. Key methods:
+- `readIndex()`: reads `index.codex.yaml` via `YAML.parse(fs.readFileSync(...))`, returns parsed object or `null`
+- `writeIndex(data)`: writes via `fs.writeFileSync(path, YAML.stringify(data))`
+- `generateFromFilesystem()`: scans workspace root recursively, builds `index.codex.yaml` tree structure from directory listing
+- `syncWithFilesystem()`: reads existing `index.codex.yaml`, compares against actual files on disk, adds new files not in index, removes entries for deleted files. Must scan `.codex.yaml`, `.codex.json`, AND `.md` files (Fact #25)
+- `findFolderChildren(folderPath)`: navigates the tree by splitting path segments, returns children array at that level
+- `moveUp(folderPath, name)` / `moveDown(folderPath, name)`: find item in parent's children array, swap with adjacent sibling
+- `moveToPosition(folderPath, name, newIndex)`: remove from current position, insert at `newIndex`
+- `moveToFolder(sourcePath, destFolder)`: remove from source parent, add to destination parent's children
+- `addEntry(folderPath, entry)` / `removeEntry(folderPath, name)`: add/remove from parent's children array
+- Singleton via `getOrderingManager(wsRoot)` / `disposeOrderingManager()`
 
 ### Step 2: Write OrderingManager tests
 
@@ -129,7 +139,18 @@ Create `src/orderingManager.test.ts` with tests for:
 - `moveToFolder` (cross-folder)
 - `addEntry` / `removeEntry`
 
-Full test code in original plan file — copy verbatim.
+**Test implementation:** Write tests using vitest with `vi.mock('fs')` and `vi.mock('path')` as needed. Key test cases:
+- `findFolderChildren('')` returns root children
+- `findFolderChildren('Chapters')` returns children of a nested folder
+- `findFolderChildren('nonexistent')` returns empty array
+- `moveUp('', 'second-item')` swaps with previous sibling, returns `true`
+- `moveUp('', 'first-item')` returns `false` (already at top)
+- `moveDown('', 'first-item')` swaps with next sibling
+- `moveToPosition('', 'item', 2)` moves item to index 2
+- `moveToFolder('Chapters/scene.codex.yaml', 'Archive')` removes from Chapters, adds to Archive
+- `addEntry('', { name: 'new.codex.yaml', type: 'file' })` adds to root children
+- `removeEntry('', 'old.codex.yaml')` removes from root children
+- Use a mock `index.codex.yaml` structure for all tests
 
 ### Step 3: Run tests — verify pass
 
@@ -229,12 +250,35 @@ async function reloadTreeIndex(): Promise<void> {
   }
 }
 
-/** Regenerate .index.codex.json cache from disk, THEN reload tree.
- *  Use after operations that mutate files on disk (create/delete/move/rename/duplicate). */
+/** Regenerate .index.codex.json cache from disk, THEN reload tree + stacked views.
+ *  Use after operations that mutate files on disk (create/delete/move/rename/duplicate).
+ *  Fact #52: generateIndex() alone only rebuilds TOP-LEVEL index. Must use
+ *  cascadeRegenerateIndexes() for per-folder indexes, and refresh stacked views. */
 async function regenerateAndReload(wsRoot: string): Promise<void> {
-  const { generateIndex } = await import('./indexGenerator');
-  await generateIndex({ workspaceRoot: wsRoot });
+  const contextFolder = treeProvider.getContextFolder();
+  const folderToRegenerate = contextFolder || '.';
+
+  // Step 1: Regenerate per-folder + top-level indexes (NOT just generateIndex)
+  const { cascadeRegenerateIndexes } = await import('./indexGenerator');
+  await cascadeRegenerateIndexes(wsRoot, folderToRegenerate);
+
+  // Step 2: Reload Navigator tree from regenerated cache
   await reloadTreeIndex();
+
+  // Step 3: Refresh stacked views (Master + Index0-7) if in stacked mode
+  if (multiIndexManager && masterTreeProvider) {
+    await multiIndexManager.discoverIndexes(wsRoot);
+    masterTreeProvider.setManager(multiIndexManager, wsRoot);
+    const subIndexes = multiIndexManager.getSubIndexes();
+    subIndexes.forEach((index: any, i: number) => {
+      if (i < subIndexProviders.length) {
+        subIndexProviders[i].setIndex(index);
+      }
+    });
+    for (let i = subIndexes.length; i < subIndexProviders.length; i++) {
+      subIndexProviders[i].setIndex(null);
+    }
+  }
 }
 ```
 
@@ -278,6 +322,8 @@ git commit -m "feat: migrate to unified ordering system (index.codex.yaml array 
 - [ ] `indexParser.ts` `IndexChildNode.order` marked `@deprecated`
 - [ ] `autofixFolderOrder` removed from package.json, extension.ts, structureEditor.ts
 - [ ] `getWorkspaceRoot()`, `resolveIndexNodeForEdit()`, `reloadTreeIndex()`, `regenerateAndReload()` added to extension.ts
+- [ ] `regenerateAndReload()` uses `cascadeRegenerateIndexes()` (NOT bare `generateIndex()`) — Fact #52
+- [ ] `regenerateAndReload()` refreshes stacked views (Master + Index0-7) after index regeneration — Fact #52
 - [ ] Startup sync via async IIFE in `activate()`
 - [ ] `cascadeRegenerateIndexes()` produces correct cache without `order` values
 - [ ] `generateFolderHierarchy()` produces correct cache without `order` values

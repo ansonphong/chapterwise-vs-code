@@ -144,7 +144,7 @@ These facts MUST be respected throughout ALL stages. Referenced by number (e.g.,
 
 37. **VS Code mock is minimal.** Lacks EventEmitter, workspace.fs, Position, Selection, etc.
 
-38. **`canSelectMany` already enabled** (treeProvider.ts:1417).
+38. **`canSelectMany` only enabled on Navigator view** (treeProvider.ts:1417). Master view (extension.ts:221) and stacked sub-index views Index0-7 (extension.ts:232) do NOT have `canSelectMany`. **Must add `canSelectMany: true` to Master and sub-index view creation** for multi-select batch operations to work in default stacked mode.
 
 39. **`autofixFolder` handler at extension.ts:1700.** Removal must cover both package.json AND extension.ts.
 
@@ -172,7 +172,7 @@ These facts MUST be respected throughout ALL stages. Referenced by number (e.g.,
 
 ## Reload Strategy (R4-5)
 
-48. **`reloadTreeIndex()` only reads cache — does NOT regenerate.** `treeProvider.setContextFolder()` at treeProvider.ts:895 calls `fs.readFileSync(indexPath)` to read `.index.codex.json` — it does NOT call `generateIndex()` or `generateFolderHierarchy()`. If the cache is stale (e.g., after adding a file to disk), `reloadTreeIndex()` alone will show stale data. Handlers that mutate files MUST call `generateIndex()` or `cascadeRegenerateIndexes()` BEFORE `reloadTreeIndex()`. The plan's `reloadTreeIndex()` helper is reload-only — prepend regeneration where needed.
+48. **`reloadTreeIndex()` only reads cache — does NOT regenerate.** `treeProvider.setContextFolder()` at treeProvider.ts:895 calls `fs.readFileSync(indexPath)` to read `.index.codex.json` — it does NOT call `generateIndex()` or `generateFolderHierarchy()`. If the cache is stale (e.g., after adding a file to disk), `reloadTreeIndex()` alone will show stale data. Handlers that mutate files MUST call `cascadeRegenerateIndexes()` (for single-folder changes) or `generateFolderHierarchy()` (for broad changes) BEFORE `reloadTreeIndex()`. **IMPORTANT:** `generateIndex()` alone is NOT sufficient — it only regenerates the TOP-LEVEL `.index.codex.json` and does NOT update per-folder indexes. Use `cascadeRegenerateIndexes(wsRoot, changedFolderPath)` for targeted regeneration (changed folder + parents + top-level) or `generateFolderHierarchy(wsRoot, startFolder)` for full recursive regeneration. After index regeneration, stacked views (Master + Index0-7) must also be refreshed — `reloadTreeIndex()` handles Navigator but does NOT update `masterTreeProvider` or `subIndexProviders`. See Fact #52 for the full refresh pattern.
 
 ## Backward Compatibility
 
@@ -187,3 +187,56 @@ These facts MUST be respected throughout ALL stages. Referenced by number (e.g.,
 ## Workspace Model
 
 51. **Single-root assumption.** `getWorkspaceRoot()` uses `workspaceFolders?.[0]` — always picks the first folder. This is intentional for V1: the extension's tree provider, settings manager, and index generator all assume single-root. Multi-root support is out of scope. If needed later, `getWorkspaceRoot()` would need to accept a file URI and resolve via `vscode.workspace.getWorkspaceFolder(uri)`.
+
+## Full Tree Refresh (Gap Fix)
+
+52. **Full tree refresh pattern (stacked mode).** `regenerateAndReload()` as defined in Stage 1 calls only `generateIndex()` which regenerates ONLY the top-level `.index.codex.json`. This is INSUFFICIENT for subfolder contexts and stacked views. The correct pattern for disk-mutating operations is:
+
+    ```typescript
+    async function regenerateAndReload(wsRoot: string): Promise<void> {
+      const contextFolder = treeProvider.getContextFolder();
+      const folderToRegenerate = contextFolder || '.';
+
+      // Step 1: Regenerate per-folder + top-level indexes
+      const { cascadeRegenerateIndexes } = await import('./indexGenerator');
+      await cascadeRegenerateIndexes(wsRoot, folderToRegenerate);
+
+      // Step 2: Reload Navigator tree
+      await reloadTreeIndex();
+
+      // Step 3: Refresh stacked views (Master + Index0-7)
+      if (multiIndexManager && masterTreeProvider) {
+        const indexes = await multiIndexManager.discoverIndexes(wsRoot);
+        masterTreeProvider.setManager(multiIndexManager, wsRoot);
+        const subIndexes = multiIndexManager.getSubIndexes();
+        subIndexes.forEach((index, i) => {
+          if (i < subIndexProviders.length) {
+            subIndexProviders[i].setIndex(index);
+          }
+        });
+        for (let i = subIndexes.length; i < subIndexProviders.length; i++) {
+          subIndexProviders[i].setIndex(null);
+        }
+      }
+    }
+    ```
+
+    **Key functions in indexGenerator.ts:**
+    - `generateIndex()` (line 125) — top-level only, writes `.index.codex.json` at root
+    - `generatePerFolderIndex()` (line 1171) — single folder's `.index.codex.json`
+    - `cascadeRegenerateIndexes()` (line 1299) — changed folder + parents + top-level
+    - `generateFolderHierarchy()` (line 1334) — ALL folders recursively + top-level (heavy)
+
+    Use `cascadeRegenerateIndexes` for targeted ops (trash one file, rename, move).
+    Use `generateFolderHierarchy` only for broad ops (initial context set, bulk changes).
+
+53. **File creation must use existing safety pipelines.** When creating new `.codex.yaml` files (e.g., `addSiblingNode` for `indexFile`, `addChildFile`), use:
+    - `structureEditor.slugifyName()` for filename sanitization (NOT inline regex)
+    - `isPathWithinWorkspace()` or `isPathWithinRoot()` for path traversal validation
+    - `getSettingsManager().getSettings()` to respect user naming conventions
+    - Reject path separators and `..` in user-provided names
+    - Use settings-driven format version (`formatVersion: "1.2"` or from settings)
+
+54. **`renameFolder` requires folder-safe path rewriting.** `renameFileInIndex()` uses `updateIncludePaths()` which does string replacement of old path → new path. For folders, renaming `ch` could match `chapter/` inside include paths. **Implementation must use path-segment-aware replacement** — match on `oldPath + path.sep` prefix, not substring. This is a known limitation (R3-10) that must be addressed with a dedicated `renameFolderInIndex()` method or by ensuring `updateIncludePaths()` uses segment-aware matching.
+
+55. **`TrashManager.moveToTrash()` must call `ensureGitignore()`.** The `ensureGitignore()` method adds `.chapterwise/trash/` to `.gitignore`. It must be called inside `moveToTrash()` (before or after the file move), NOT left to callers. This ensures trash is always gitignored regardless of entry point.

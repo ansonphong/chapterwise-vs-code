@@ -249,7 +249,27 @@ context.subscriptions.push(
 );
 ```
 
-> **Fact #38:** `canSelectMany` is already enabled (treeProvider.ts:1417).
+> **Fact #38 CORRECTED:** `canSelectMany` is only enabled on the Navigator view (treeProvider.ts:1417). Master view (extension.ts:221) and stacked sub-index views Index0-7 (extension.ts:232) do NOT have it. **Must add `canSelectMany: true` to both** for batch ops to work in default stacked mode.
+
+### Step 4b: Enable multi-select on Master + stacked views
+
+In `src/extension.ts`, update the Master view creation (~line 221):
+```typescript
+const masterView = vscode.window.createTreeView('chapterwiseCodexMaster', {
+  treeDataProvider: masterTreeProvider,
+  showCollapseAll: true,
+  canSelectMany: true  // Required for batch operations in stacked mode
+});
+```
+
+And in the sub-index view creation loop (~line 232):
+```typescript
+const view = vscode.window.createTreeView(`chapterwiseCodexIndex${i}`, {
+  treeDataProvider: provider,
+  showCollapseAll: true,
+  canSelectMany: true  // Required for batch operations in stacked mode
+});
+```
 
 ### Step 5: Add `inlineThisFile` to codexNode context menu
 
@@ -277,6 +297,8 @@ git commit -m "feat: add Inline This File, Add Subfolder, multi-select batch ope
 - [ ] `inlineThisFile` command registered with delete-original prompt
 - [ ] `addChildFolder` command creates directory + updates index (no duplicate `const wsRoot`)
 - [ ] `addChildFolder` sanitizes folder name and validates path within workspace (Fact #47)
+- [ ] `canSelectMany: true` added to Master view creation (extension.ts ~line 221)
+- [ ] `canSelectMany: true` added to sub-index view creation loop (extension.ts ~line 232)
 - [ ] `batchMoveToTrash` uses `(item, selectedItems)` signature (not variadic)
 - [ ] `batchAddTags` uses `(item, selectedItems)` signature
 - [ ] `inlineThisFile` added to codexNode context menu

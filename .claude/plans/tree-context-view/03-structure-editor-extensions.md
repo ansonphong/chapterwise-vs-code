@@ -30,7 +30,14 @@ Tests for:
 - `addRelationToNode` — adds relation entry
 - `setEmojiOnNode` — sets emoji field
 
-Full test code: see original plan (lines 1467-1553).
+**Test implementation:** Write tests using vitest. Create a helper function that builds a mock `CodexNode` with known path segments and fields. For each method, parse a known YAML document, call the method, and verify the output YAML. Key test cases:
+- `addFieldToNode`: adds `synopsis: ""` to a node that doesn't have it; returns `false` if field already exists; works on `['children', 0]` nested path
+- `removeFieldFromNode`: removes `synopsis` field from node; leaves other fields intact
+- `renameFieldOnNode`: renames `synopsis` → `overview`; preserves value
+- `changeNodeType`: changes node's `type` from `scene` to `chapter`
+- `addTagsToNode`: adds `['action', 'drama']` to node with no tags; appends `['new']` to existing `['action']` without duplicating `action`
+- `addRelationToNode`: adds `{ targetId: 'uuid-123', type: 'follows' }` to relations array
+- `setEmojiOnNode`: sets `emoji: '📖'` on node
 
 ### Step 2: Run tests — verify FAIL
 

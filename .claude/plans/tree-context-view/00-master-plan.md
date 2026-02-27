@@ -52,14 +52,14 @@ When Ralph reads this file, follow these rules:
 **Design doc:** `.claude/plans/2026-02-21-tree-view-context-menu-ux.md`
 
 **Shared references:**
-- `codebase-facts.md` — 51 codebase facts referenced by all stages
+- `codebase-facts.md` — 55 codebase facts referenced by all stages
 - `review-findings.md` — 5 rounds of review findings (R1-R5) with resolutions
 
 **Key cross-cutting facts:**
 - **Fact #1:** Lazy imports for `structureEditor`, `settingsManager`, etc.
 - **Fact #14:** `npm run compile` is the canonical build command (esbuild, NOT `tsc --noEmit`)
 - **Fact #45:** Default mode is "stacked" — menus must work in all views (not just Navigator)
-- **Fact #48:** `reloadTreeIndex()` only reads cache. Disk-mutating ops MUST use `regenerateAndReload(wsRoot)`
+- **Fact #48/52:** `reloadTreeIndex()` only reads cache. Disk-mutating ops MUST use `regenerateAndReload(wsRoot)` which calls `cascadeRegenerateIndexes()` (NOT bare `generateIndex()`) + refreshes stacked views
 - **Fact #47:** `inlineThisFile` must check `isPathWithinWorkspace()` before reading include targets
 
 ---
@@ -101,7 +101,7 @@ Stage 1 (Foundation)
 
 ### Stage 2: New Modules — TrashManager + ClipboardManager (`02-new-modules.md`)
 
-- [ ] **Task 1:** Create TrashManager (`.chapterwise/trash/` system) + wire into removeFileFromIndex
+- [ ] **Task 1:** Create TrashManager (`.chapterwise/trash/` system) + wire into removeFileFromIndex. `moveToTrash()` must call `ensureGitignore()` internally (Fact #55)
   - Test: `cd /Users/phong/Projects/chapterwise-codex && npx vitest run src/trashManager.test.ts && npm test && npm run compile`
   - Files: `src/trashManager.ts`, `src/trashManager.test.ts`, `src/structureEditor.ts`
 
@@ -165,7 +165,7 @@ Stage 1 (Foundation)
   - Test: `cd /Users/phong/Projects/chapterwise-codex && npm run compile`
   - Files: `src/extension.ts`
 
-- [ ] **Task 10:** Register trash, duplicate, cut/paste, extract, folder commands (moveToTrash, duplicateNode, cutNode, pasteNodeAsChild, pasteNodeAsSibling, restoreFromTrash, emptyTrash, extractToFile, addChildFile, renameFolder)
+- [ ] **Task 10:** Register trash, duplicate, cut/paste, extract, folder commands. `addChildFile` uses `slugifyName()` + `isPathWithinWorkspace()` (Fact #53). `pasteNodeAsSibling` handles file-backed nodes. `renameFolder` uses segment-aware path rewriting (Fact #54)
   - Test: `cd /Users/phong/Projects/chapterwise-codex && npm run compile`
   - Files: `src/extension.ts`
 
@@ -180,7 +180,7 @@ Stage 1 (Foundation)
   - Test: `cd /Users/phong/Projects/chapterwise-codex && npm run compile`
   - Files: `src/treeProvider.ts`, `src/extension.ts`
 
-- [ ] **Task 12:** Missing operations — inlineThisFile, addChildFolder, multi-select batch ops
+- [ ] **Task 12:** Missing operations — inlineThisFile, addChildFolder, multi-select batch ops. Enable `canSelectMany` on Master + Index0-7 views (Fact #38 corrected)
   - Test: `cd /Users/phong/Projects/chapterwise-codex && npm run compile`
   - Files: `src/structureEditor.ts`, `src/extension.ts`, `package.json`
 
@@ -234,4 +234,8 @@ Stage 1 (Foundation)
 - **Build command:** `npm run compile` (esbuild, Fact #14). NOT `tsc --noEmit`.
 - **Test command:** `npm test` (vitest)
 - **Lazy imports:** Always use `const { X } = await import('./module')` pattern (Fact #1)
-- **Reload strategy:** YAML-only edits → `reloadTreeIndex()`. Disk mutations → `regenerateAndReload(wsRoot)` (Fact #48)
+- **Reload strategy:** YAML-only edits → `reloadTreeIndex()`. Disk mutations → `regenerateAndReload(wsRoot)` which uses `cascadeRegenerateIndexes()` + stacked view refresh (Facts #48, #52)
+- **Multi-select:** `canSelectMany` must be added to Master + Index0-7 views (Fact #38 corrected)
+- **File creation safety:** Always use `slugifyName()` + `isPathWithinWorkspace()` (Fact #53)
+- **Folder rename:** Use segment-aware include path replacement, NOT `renameFileInIndex()` (Fact #54)
+- **Trash gitignore:** `moveToTrash()` must call `ensureGitignore()` internally (Fact #55)

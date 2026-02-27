@@ -111,6 +111,8 @@ Open a project with `.codex.yaml` files and test EACH node type:
 - [ ] Cut + Paste file-backed nodes → file moved, index updated
 - [ ] Keyboard shortcuts: Delete=moveToTrash, Shift+Delete=deleteNodePermanently, Cmd+D=duplicateNode, Cmd+X=cutNode, Cmd+V=pasteNodeAsChild, F2=renameNode, Cmd+N=addSiblingNode
 - [ ] Keyboard shortcuts work in Navigator, Master, AND stacked Index views (scoped via `focusedView =~ /^chapterwiseCodex/`)
+- [ ] Multi-select works in stacked views (Master + Index0-7 have `canSelectMany: true`)
+- [ ] `regenerateAndReload()` refreshes stacked views — no stale data in Index0-7 after file ops
 - [ ] Multi-select → batch trash (`batchMoveToTrash`), batch add tags (`batchAddTags`)
 - [ ] Multi-select batch tags uses single prompt (not per-item re-prompt)
 - [ ] Index regeneration → tree updates after every file-mutating operation (uses `regenerateAndReload`)

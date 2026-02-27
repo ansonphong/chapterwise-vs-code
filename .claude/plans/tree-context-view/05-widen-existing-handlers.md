@@ -97,13 +97,33 @@ if (treeItem instanceof IndexNodeTreeItem) {
     const filePath = treeItem.indexNode._computed_path;
     if (!filePath) return;
     const dir = path.dirname(filePath);
-    const slugName = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+    // Fact #53: Use existing safety pipelines for file creation
+    // Reject path separators and traversal patterns in user input
+    if (/[/\\]/.test(name) || name === '..' || name === '.') {
+      vscode.window.showErrorMessage('Invalid node name');
+      return;
+    }
+    // Use structureEditor.slugifyName() for consistent filename sanitization
+    const { getStructureEditor } = await import('./structureEditor');
+    const { getSettingsManager } = await import('./settingsManager');
+    const editor = getStructureEditor();
+    const settings = await getSettingsManager().getSettings(vscode.Uri.file(path.join(wsRoot, filePath)));
+    const slugName = (editor as any).slugifyName(name, settings.naming);
     const newFilePath = path.join(dir, `${slugName}.codex.yaml`);
     const newFullPath = path.join(wsRoot, newFilePath);
+
+    // Fact #47/53: Path traversal validation
+    const { isPathWithinWorkspace } = await import('./writerView/utils/helpers');
+    if (!isPathWithinWorkspace(newFullPath, wsRoot)) {
+      vscode.window.showErrorMessage('File path resolves outside workspace');
+      return;
+    }
+
     const { randomUUID } = await import('crypto');
     const content = `metadata:\n  formatVersion: "1.2"\nid: "${randomUUID()}"\ntype: ${type}\nname: "${name}"\nbody: ""\n`;
     await vscode.workspace.fs.writeFile(vscode.Uri.file(newFullPath), Buffer.from(content, 'utf-8'));
-    // Fact #48: new file created on disk — must regenerate index cache
+    // Fact #48/52: new file created on disk — must regenerate index cache + stacked views
     await regenerateAndReload(wsRoot);
   } else if (nodeKind === 'node') {
     // Inline sibling in backing file
@@ -214,6 +234,7 @@ git commit -m "refactor: widen existing command handlers to accept IndexNodeTree
 - [ ] Backward-compat alias for `navigateToNodeInCodeView` registered (Fact #49, R5-1)
 - [ ] `addChildNode` accepts IndexNodeTreeItem (indexFile + indexNode)
 - [ ] `addSiblingNode` accepts IndexNodeTreeItem (file creation + inline sibling)
+- [ ] `addSiblingNode` file creation uses `slugifyName()` + `isPathWithinWorkspace()` (Fact #53)
 - [ ] `renameNode` accepts IndexNodeTreeItem (file rename + inline rename)
 - [ ] `goToYaml` accepts IndexNodeTreeItem + CodexFieldTreeItem
 - [ ] `copyId` accepts IndexNodeTreeItem

@@ -173,7 +173,8 @@ await reloadTreeIndex();  // triggers re-render with cut indicator
 
 **pasteNodeAsSibling:**
 - `CodexTreeItem` + non-file-backed: `editor.moveNodeInDocument(doc, source, target, 'after')`
-- End with `clipboardManager.clear()` + `await reloadTreeIndex()`
+- `IndexNodeTreeItem` + `nodeKind === 'file'` + clipboard `isFileBacked`: create sibling file next to target. Use `getSettingsManager().getSettings()` for naming, `isPathWithinWorkspace()` for validation, then `fs.rename()` or `fs.copyFile()` the cut file to the new sibling location. End with `regenerateAndReload(wsRoot)`. (Fact #53: use existing safety pipelines)
+- End with `clipboardManager.clear()` + appropriate reload (`regenerateAndReload` for file moves, `reloadTreeIndex` for inline moves)
 
 ### Step 5: Register restoreFromTrash, emptyTrash, extractToFile, addChildFile, renameFolder
 
@@ -183,9 +184,94 @@ await reloadTreeIndex();  // triggers re-render with cut indicator
 
 **extractToFile:** Call `editor.extractNodeToFile()`. Creates new file → `regenerateAndReload(wsRoot)`.
 
-**addChildFile:** Create new `.codex.yaml` in folder → `regenerateAndReload(wsRoot)`.
+**addChildFile:** Prompt for name, reject path separators and `..`/`.`. Use `structureEditor.slugifyName(name, settings.naming)` for filename sanitization (Fact #53 — NOT inline regex). Validate with `isPathWithinWorkspace()`. Create new `.codex.yaml` with `crypto.randomUUID()` ID, format version from settings. Add to `index.codex.yaml` via `om.addEntry()`. End with `regenerateAndReload(wsRoot)`.
 
-**renameFolder:** Use `structureEditor.renameFileInIndex()` (pre-existing method, not a Stage 3 addition; handles include path updates, R1-7). Note: string replacement not path-segment-aware for folders (R3-10 — documented limitation).
+```typescript
+'chapterwiseCodex.addChildFile', async (treeItem?: IndexNodeTreeItem) => {
+  if (!treeItem) return;
+  const nodeKind = (treeItem.indexNode as any)._node_kind;
+  if (nodeKind !== 'folder') return;
+  const name = await vscode.window.showInputBox({ prompt: 'Enter file name' });
+  if (!name) return;
+  // Sanitize: reject path separators and traversal patterns
+  if (/[/\\]/.test(name) || name === '..' || name === '.') {
+    vscode.window.showErrorMessage('Invalid file name');
+    return;
+  }
+  const wsRoot = getWorkspaceRoot();
+  if (!wsRoot) return;
+  const parentPath = treeItem.indexNode._computed_path || '';
+  // Use existing slugify pipeline (Fact #53)
+  const { getStructureEditor } = await import('./structureEditor');
+  const { getSettingsManager } = await import('./settingsManager');
+  const editor = getStructureEditor();
+  const fileUri = vscode.Uri.file(path.join(wsRoot, parentPath));
+  const settings = await getSettingsManager().getSettings(fileUri);
+  const slugName = (editor as any).slugifyName(name, settings.naming);
+  const newFilePath = path.join(parentPath, `${slugName}.codex.yaml`);
+  const newFullPath = path.join(wsRoot, newFilePath);
+  // Path traversal validation (Fact #47)
+  const { isPathWithinWorkspace } = await import('./writerView/utils/helpers');
+  if (!isPathWithinWorkspace(newFullPath, wsRoot)) {
+    vscode.window.showErrorMessage('File path resolves outside workspace');
+    return;
+  }
+  const { randomUUID } = await import('crypto');
+  const content = `metadata:\n  formatVersion: "1.2"\nid: "${randomUUID()}"\ntype: chapter\nname: "${name}"\nbody: ""\n`;
+  await vscode.workspace.fs.writeFile(vscode.Uri.file(newFullPath), Buffer.from(content, 'utf-8'));
+  // Add to ordering index
+  const { getOrderingManager } = await import('./orderingManager');
+  const om = getOrderingManager(wsRoot);
+  await om.addEntry(parentPath, { name: `${slugName}.codex.yaml`, type: 'file' });
+  await regenerateAndReload(wsRoot);
+}
+```
+
+**renameFolder:** Do NOT use `renameFileInIndex()` for folders — it uses string replacement for include path updates that is NOT path-segment-aware (Fact #54). Instead, implement folder rename inline:
+
+```typescript
+'chapterwiseCodex.renameFolder', async (treeItem?: IndexNodeTreeItem) => {
+  if (!treeItem) return;
+  const nodeKind = (treeItem.indexNode as any)._node_kind;
+  if (nodeKind !== 'folder') return;
+  const wsRoot = getWorkspaceRoot();
+  if (!wsRoot) return;
+  const oldPath = treeItem.indexNode._computed_path;
+  if (!oldPath) return;
+  const oldName = path.basename(oldPath);
+  const newName = await vscode.window.showInputBox({
+    prompt: 'Enter new folder name',
+    value: oldName
+  });
+  if (!newName || newName === oldName) return;
+  // Sanitize folder name
+  if (/[/\\]/.test(newName) || newName === '..' || newName === '.') {
+    vscode.window.showErrorMessage('Invalid folder name');
+    return;
+  }
+  const parentDir = path.dirname(oldPath);
+  const newPath = parentDir === '.' ? newName : path.join(parentDir, newName);
+  const oldFullPath = path.join(wsRoot, oldPath);
+  const newFullPath = path.join(wsRoot, newPath);
+  // Path traversal validation (Fact #47)
+  const { isPathWithinWorkspace } = await import('./writerView/utils/helpers');
+  if (!isPathWithinWorkspace(newFullPath, wsRoot)) {
+    vscode.window.showErrorMessage('Folder path resolves outside workspace');
+    return;
+  }
+  // Rename on disk
+  const fsPromises = await import('fs/promises');
+  await fsPromises.rename(oldFullPath, newFullPath);
+  // Update include paths using SEGMENT-AWARE replacement (Fact #54)
+  // Match on oldPath + path.sep prefix to avoid substring collisions
+  const { getStructureEditor } = await import('./structureEditor');
+  const editor = getStructureEditor();
+  await (editor as any).updateIncludePathsSegmentAware(wsRoot, oldPath, newPath);
+  await regenerateAndReload(wsRoot);
+}
+```
+
+**NOTE (Fact #54):** `updateIncludePathsSegmentAware()` is a new helper method needed on `structureEditor` that replaces include path prefixes using path-segment matching (e.g., only matches `chapters/` not `ch` inside `chapter/`). If adding this method is too complex for this stage, use `updateIncludePaths()` but document the substring-collision risk as a known limitation and add a TODO for future fix.
 
 ### Step 6: Verify build
 
@@ -216,8 +302,10 @@ git commit -m "feat: register trash, duplicate, cut/paste, extract, folder comma
 - [ ] `pasteNodeAsSibling` handles inline move
 - [ ] `restoreFromTrash` + `emptyTrash` use TrashManager
 - [ ] `extractToFile` creates file + include directive
-- [ ] `addChildFile` creates entry + regenerates index (`addChildFolder` is in Stage 7)
-- [ ] `renameFolder` uses `renameFileInIndex()` for include path maintenance
+- [ ] `addChildFile` uses `slugifyName()` + `isPathWithinWorkspace()` + `om.addEntry()` (Fact #53)
+- [ ] `addChildFile` rejects path separators and traversal patterns in user input
+- [ ] `pasteNodeAsSibling` handles file-backed nodes (creates sibling file, not just inline) — fixes Stage 6/8 contradiction
+- [ ] `renameFolder` does NOT use `renameFileInIndex()` — uses inline folder rename with segment-aware include path updates (Fact #54)
 - [ ] YAML-only ops use `reloadTreeIndex()`, disk-mutating ops use `regenerateAndReload(wsRoot)` (Fact #48)
 - [ ] No handler uses bare `treeProvider.refresh()`
 - [ ] No `treeItem.documentUri` used for edit targets (uses `resolveIndexNodeForEdit`)
