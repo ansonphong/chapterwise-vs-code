@@ -95,7 +95,7 @@ function getWorkspaceRoot(): string | undefined {
 }
 
 /** Resolve an IndexNodeTreeItem to its backing document + CodexNode. */
-async function resolveIndexNodeForEdit(treeItem: IndexNodeTreeItem, wsRoot: string): Promise<{ doc: vscode.TextDocument; node: any } | null> {
+async function resolveIndexNodeForEdit(treeItem: IndexNodeTreeItem, wsRoot: string): Promise<{ doc: vscode.TextDocument; node: CodexNode } | null> {
   const nodeKind = (treeItem.indexNode as any)._node_kind;
   if (nodeKind === 'file') {
     const computedPath = treeItem.indexNode._computed_path;
@@ -1620,7 +1620,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
             const { getSettingsManager } = await import('./settingsManager');
             const ed = getStructureEditor();
             const settings = await getSettingsManager().getSettings(vscode.Uri.file(path.join(wsRoot, filePath)));
-            const slugName = (ed as any).slugifyName(name, settings.naming);
+            const slugName = ed.slugifyName(name, settings.naming);
             const newFilePath = path.join(dir, `${slugName}.codex.yaml`);
             const newFullPath = path.join(wsRoot, newFilePath);
 
@@ -2213,6 +2213,11 @@ function registerCommands(context: vscode.ExtensionContext): void {
           const base = filePath.slice(0, -ext.length);
           const newPath = `${base}-copy${ext}`;
           const newFullPath = path.join(wsRoot, newPath);
+          const { isPathWithinWorkspace } = await import('./writerView/utils/helpers');
+          if (!isPathWithinWorkspace(newFullPath, wsRoot)) {
+            vscode.window.showErrorMessage('Duplicate path resolves outside workspace');
+            return;
+          }
           const fsPromises = (await import('fs/promises'));
           await fsPromises.copyFile(fullPath, newFullPath);
           await regenerateAndReload(wsRoot);
@@ -2298,6 +2303,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
           return;
         }
       }
+      vscode.window.showInformationMessage('Paste is only supported for file-backed nodes');
       cb.clear();
       await reloadTreeIndex();
     })
@@ -2328,6 +2334,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
         await regenerateAndReload(wsRoot);
         return;
       }
+      vscode.window.showInformationMessage('Paste is only supported for file-backed nodes');
       cb.clear();
       await reloadTreeIndex();
     })
@@ -2345,9 +2352,9 @@ function registerCommands(context: vscode.ExtensionContext): void {
         vscode.window.showInformationMessage('Trash is empty');
         return;
       }
-      const picked = await vscode.window.showQuickPick(items.map(i => ({ label: i.name, item: i })), { placeHolder: 'Select item to restore' });
+      const picked = await vscode.window.showQuickPick(items.map(i => ({ label: i.relativePath, description: i.name, item: i })), { placeHolder: 'Select item to restore' });
       if (!picked) return;
-      await trash.restoreFromTrash(picked.item.name);
+      await trash.restoreFromTrash(picked.item.relativePath);
       await regenerateAndReload(wsRoot);
     })
   );
@@ -2413,7 +2420,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
       const { getSettingsManager } = await import('./settingsManager');
       const editor = getStructureEditor();
       const settings = await getSettingsManager().getSettings(vscode.Uri.file(path.join(wsRoot, parentPath)));
-      const slugName = (editor as any).slugifyName(name, settings.naming);
+      const slugName = editor.slugifyName(name, settings.naming);
       const newFilePath = path.join(parentPath, `${slugName}.codex.yaml`);
       const newFullPath = path.join(wsRoot, newFilePath);
       const { isPathWithinWorkspace } = await import('./writerView/utils/helpers');

@@ -1027,7 +1027,7 @@ export class CodexStructureEditor {
   /**
    * Slugify a name based on naming settings
    */
-  private slugifyName(name: string, namingSettings: NavigatorSettings['naming']): string {
+  slugifyName(name: string, namingSettings: NavigatorSettings['naming']): string {
     let slug = name;
     
     // Convert to lowercase unless preserving case
