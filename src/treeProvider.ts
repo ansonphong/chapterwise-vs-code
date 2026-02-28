@@ -1132,13 +1132,13 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
         );
         const showFields = this.getShowFields();
         items.push(...matchingNodes.map(
-          (node) => new CodexTreeItem(
+          (node) => this.applyCutIndicator(new CodexTreeItem(
             node,
             uri,
             false,
             false,
             showFields && (node.availableFields.length > 0 || node.hasAttributes || node.hasContentSections)
-          )
+          ))
         ));
         return items;
       }
@@ -1154,11 +1154,11 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
 
         // If root has meaningful content, show it; otherwise show its children
         if (root.id || root.type !== 'unknown') {
-          items.push(new CodexTreeItem(root, uri, (root.children?.length ?? 0) > 0, true, nodeHasFields(root)));
+          items.push(this.applyCutIndicator(new CodexTreeItem(root, uri, (root.children?.length ?? 0) > 0, true, nodeHasFields(root))));
         } else {
           // Root is just a container, show children directly
           items.push(...(root.children ?? []).map(
-            (child) => new CodexTreeItem(child, uri, (child.children?.length ?? 0) > 0, true, nodeHasFields(child))
+            (child) => this.applyCutIndicator(new CodexTreeItem(child, uri, (child.children?.length ?? 0) > 0, true, nodeHasFields(child)))
           ));
         }
       }
@@ -1218,13 +1218,13 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
     // Add child nodes
     const childHasFields = showFields;
     items.push(...(node.children ?? []).map(
-      (child) => new CodexTreeItem(
+      (child) => this.applyCutIndicator(new CodexTreeItem(
         child,
         uri,
         (child.children?.length ?? 0) > 0,
         false,
         childHasFields && (child.availableFields.length > 0 || child.hasAttributes || child.hasContentSections)
-      )
+      ))
     ));
 
     return items;
@@ -1348,6 +1348,16 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
   }
 
   /**
+   * Apply cut indicator to a CodexTreeItem if the node is in the clipboard
+   */
+  private applyCutIndicator(item: CodexTreeItem): CodexTreeItem {
+    if (item.codexNode.id && this.isNodeCut(item.codexNode.id)) {
+      item.description = `${item.description || ''} (cut)`.trim();
+    }
+    return item;
+  }
+
+  /**
    * Load and parse a .codex.yaml file to show its internal structure
    */
   private getCodexFileStructure(element: IndexNodeTreeItem, workspaceRoot: string): CodexTreeItemType[] {
@@ -1391,13 +1401,13 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
       // Return the root node's children (modules) as tree items
       if (root.children && root.children.length > 0) {
         const items = root.children.map(child =>
-          new CodexTreeItem(
+          this.applyCutIndicator(new CodexTreeItem(
             child,
             fileUri,
             (child.children?.length ?? 0) > 0,
             false, // Don't expand by default
             false  // Don't show fields for now (just the structure)
-          )
+          ))
         );
         console.log('[ChapterWise Codex] Returning', items.length, 'child items');
         return items;

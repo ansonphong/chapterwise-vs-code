@@ -11,6 +11,7 @@ import { CodexTreeProvider, CodexTreeItem, CodexFieldTreeItem, IndexNodeTreeItem
 import { WriterViewManager } from './writerView';
 import { initializeValidation } from './validation';
 import { isCodexFile, isMarkdownFile, parseMarkdownAsCodex, parseCodex, CodexNode } from './codexModel';
+import type { ClipboardManager } from './clipboardManager';
 import { runAutoFixer, disposeAutoFixer } from './autoFixer';
 import { runExplodeCodex, disposeExplodeCodex } from './explodeCodex';
 import { runImplodeCodex, disposeImplodeCodex } from './implodeCodex';
@@ -2227,7 +2228,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
   // Cut node (store in clipboard)
   // ClipboardManager is lazily initialized on first cut
-  let clipboardManager: any = null;
+  let clipboardManager: ClipboardManager | null = null;
   const getClipboard = async () => {
     if (!clipboardManager) {
       const { ClipboardManager } = await import('./clipboardManager');
