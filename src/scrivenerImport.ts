@@ -444,7 +444,7 @@ export async function runScrivenerImport(context: vscode.ExtensionContext): Prom
  */
 export function registerScrivenerImport(context: vscode.ExtensionContext): void {
   const command = vscode.commands.registerCommand(
-    'chapterwiseCodex.importScrivener',
+    'chapterwise.importScrivener',
     () => runScrivenerImport(context)
   );
   context.subscriptions.push(command);

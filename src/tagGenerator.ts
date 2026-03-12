@@ -656,7 +656,7 @@ let outputChannel: vscode.OutputChannel | undefined;
 
 function getOutputChannel(): vscode.OutputChannel {
   if (!outputChannel) {
-    outputChannel = vscode.window.createOutputChannel('ChapterWise Codex Tag Generator');
+    outputChannel = vscode.window.createOutputChannel('ChapterWise Tag Generator');
   }
   return outputChannel;
 }

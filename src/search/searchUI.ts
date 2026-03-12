@@ -32,7 +32,7 @@ export function initializeStatusBar(context: vscode.ExtensionContext): void {
     vscode.StatusBarAlignment.Right,
     100
   );
-  statusBarItem.command = 'chapterwiseCodex.search';
+  statusBarItem.command = 'chapterwise.search';
   context.subscriptions.push(statusBarItem);
   updateStatusBar('idle');
 }

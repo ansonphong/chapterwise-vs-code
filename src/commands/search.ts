@@ -47,7 +47,7 @@ export function registerSearchCommands(
 
   // Search command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.search', async () => {
+    vscode.commands.registerCommand('chapterwise.search', async () => {
       const searchIndexManager = deps.getSearchIndexManager();
       if (!searchIndexManager) {
         vscode.window.showErrorMessage('Search not initialized');
@@ -70,7 +70,7 @@ export function registerSearchCommands(
 
           if (isStructural) {
             await vscode.commands.executeCommand(
-              'chapterwiseCodex.navigateToNode',
+              'chapterwise.navigateToNode',
               { nodeId: result.id, parentFile: result.path }
             );
           } else if (workspaceRoot) {
@@ -114,7 +114,7 @@ export function registerSearchCommands(
 
   // Rebuild search index command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.rebuildSearchIndex', async () => {
+    vscode.commands.registerCommand('chapterwise.rebuildSearchIndex', async () => {
       const searchIndexManager = deps.getSearchIndexManager();
       if (!searchIndexManager) return;
 

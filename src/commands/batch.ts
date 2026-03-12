@@ -10,7 +10,7 @@ export function registerBatchCommands(
 
   // Batch move to trash (multi-select)
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.batchMoveToTrash',
+    vscode.commands.registerCommand('chapterwise.batchMoveToTrash',
       async (item: CodexTreeItem | IndexNodeTreeItem, selectedItems: (CodexTreeItem | IndexNodeTreeItem)[]) => {
         const items = selectedItems || [item];
         const confirm = await vscode.window.showWarningMessage(
@@ -18,7 +18,7 @@ export function registerBatchCommands(
         );
         if (confirm !== 'Move to Trash') return;
         for (const ti of items) {
-          await vscode.commands.executeCommand('chapterwiseCodex.moveToTrash', ti);
+          await vscode.commands.executeCommand('chapterwise.moveToTrash', ti);
         }
       }
     )
@@ -26,7 +26,7 @@ export function registerBatchCommands(
 
   // Batch add tags (multi-select)
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.batchAddTags',
+    vscode.commands.registerCommand('chapterwise.batchAddTags',
       async (item: CodexTreeItem | IndexNodeTreeItem, selectedItems: (CodexTreeItem | IndexNodeTreeItem)[]) => {
         const items = selectedItems || [item];
         const input = await vscode.window.showInputBox({ prompt: `Add tags to ${items.length} items (comma-separated)` });

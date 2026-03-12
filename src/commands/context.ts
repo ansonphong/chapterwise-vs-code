@@ -11,7 +11,7 @@ export function registerContextCommands(
 
   // Set Context Folder command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.setContextFolder', async (uri: vscode.Uri) => {
+    vscode.commands.registerCommand('chapterwise.setContextFolder', async (uri: vscode.Uri) => {
       if (!uri) {
         vscode.window.showErrorMessage('No folder selected');
         return;
@@ -63,12 +63,12 @@ export function registerContextCommands(
 
         treeView.title = `📋 ${path.basename(uri.fsPath)}`;
 
-        await context.workspaceState.update('chapterwiseCodex.lastContextPath', uri.fsPath);
-        await context.workspaceState.update('chapterwiseCodex.lastContextType', 'folder');
+        await context.workspaceState.update('chapterwise.lastContextPath', uri.fsPath);
+        await context.workspaceState.update('chapterwise.lastContextType', 'folder');
         outputChannel.appendLine(`[setContextFolder] Context saved to workspace state`);
 
         if (multiIndexManager && workspaceRoot) {
-          const config = vscode.workspace.getConfiguration('chapterwiseCodex');
+          const config = vscode.workspace.getConfiguration('chapterwise');
           const displayMode = config.get<string>('indexDisplayMode', 'stacked');
 
           if (displayMode === 'stacked') {
@@ -104,7 +104,7 @@ export function registerContextCommands(
 
   // Set Context File command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.setContextFile', async (uri?: vscode.Uri) => {
+    vscode.commands.registerCommand('chapterwise.setContextFile', async (uri?: vscode.Uri) => {
       if (!uri) {
         vscode.window.showErrorMessage('No file selected');
         return;
@@ -127,8 +127,8 @@ export function registerContextCommands(
 
         treeView.title = `📄 ${path.basename(uri.fsPath, '.codex.yaml')}`;
 
-        await context.workspaceState.update('chapterwiseCodex.lastContextPath', uri.fsPath);
-        await context.workspaceState.update('chapterwiseCodex.lastContextType', 'file');
+        await context.workspaceState.update('chapterwise.lastContextPath', uri.fsPath);
+        await context.workspaceState.update('chapterwise.lastContextType', 'file');
         outputChannel.appendLine(`[setContextFile] Context saved to workspace state`);
 
         outputChannel.appendLine(`[setContextFile] Complete - Viewing: ${path.basename(uri.fsPath)}`);
@@ -142,7 +142,7 @@ export function registerContextCommands(
 
   // Reset Context command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.resetContext', async () => {
+    vscode.commands.registerCommand('chapterwise.resetContext', async () => {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders || workspaceFolders.length === 0) {
         vscode.window.showErrorMessage('No workspace folder found');
@@ -153,10 +153,10 @@ export function registerContextCommands(
 
       await treeProvider.setContextFolder(null, workspaceRoot);
 
-      treeView.title = 'ChapterWise Codex';
+      treeView.title = 'ChapterWise';
 
-      await context.workspaceState.update('chapterwiseCodex.lastContextPath', undefined);
-      await context.workspaceState.update('chapterwiseCodex.lastContextType', undefined);
+      await context.workspaceState.update('chapterwise.lastContextPath', undefined);
+      await context.workspaceState.update('chapterwise.lastContextType', undefined);
       outputChannel.appendLine(`[resetContext] Context cleared from workspace state`);
 
       treeProvider.refresh();

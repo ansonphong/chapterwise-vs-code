@@ -1,4 +1,4 @@
-# CLAUDE.md — Chapterwise Codex
+# CLAUDE.md — ChapterWise
 
 VS Code extension for managing structured writing projects in YAML-based "Codex" format.
 
@@ -33,7 +33,7 @@ code --install-extension *.vsix --force
 
 | Subsystem | Key Files | Purpose |
 |-----------|-----------|---------|
-| **Tree Navigation** | `treeProvider.ts`, `indexParser.ts`, `multiIndexManager.ts`, `subIndexTreeProvider.ts`, `masterIndexTreeProvider.ts` | Codex Explorer sidebar, index caching, multi-file discovery |
+| **Tree Navigation** | `treeProvider.ts`, `indexParser.ts`, `multiIndexManager.ts`, `subIndexTreeProvider.ts`, `masterIndexTreeProvider.ts` | ChapterWise Explorer sidebar, index caching, multi-file discovery |
 | **Document Model** | `codexModel.ts` | Parse/mutate YAML (.codex.yaml), JSON (.codex.json), Markdown (.md w/ frontmatter) |
 | **Writer View** | `writerView/manager.ts`, `writerView/script.ts`, `writerView/html/builder.ts` | Distraction-free webview editor, image handling, prose editing |
 | **Structure Editing** | `structureEditor.ts`, `fileOrganizer.ts`, `dragDropController.ts`, `clipboardManager.ts`, `trashManager.ts`, `orderingManager.ts` | Node CRUD, drag/drop, cut/paste, trash/restore |

@@ -12,14 +12,14 @@ export function registerNavigatorCommands(
 
   // Open Navigator command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.openNavigator', () => {
+    vscode.commands.registerCommand('chapterwise.openNavigator', () => {
       const editor = vscode.window.activeTextEditor;
       if (editor && isCodexFile(editor.document.fileName)) {
         treeProvider.setActiveDocument(editor.document);
-        vscode.commands.executeCommand('chapterwiseCodexNavigator.focus');
+        vscode.commands.executeCommand('chapterwiseNavigator.focus');
       } else {
         vscode.window.showInformationMessage(
-          'Open a .codex.yaml or .codex.json file to use the Codex Navigator'
+          'Open a .codex.yaml or .codex.json file to use the ChapterWise Navigator'
         );
       }
     })
@@ -27,14 +27,14 @@ export function registerNavigatorCommands(
 
   // Refresh tree command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.refresh', () => {
+    vscode.commands.registerCommand('chapterwise.refresh', () => {
       treeProvider.refresh();
     })
   );
 
   // Filter by type command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.filterByType', async () => {
+    vscode.commands.registerCommand('chapterwise.filterByType', async () => {
       const types = treeProvider.getTypes();
 
       if (types.length === 0) {
@@ -58,7 +58,7 @@ export function registerNavigatorCommands(
 
       const selected = await vscode.window.showQuickPick(items, {
         placeHolder: 'Filter nodes by type',
-        title: 'Codex Node Filter',
+        title: 'ChapterWise Node Filter',
       });
 
       if (selected !== undefined) {
@@ -75,7 +75,7 @@ export function registerNavigatorCommands(
 
   // Toggle field display command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.toggleFields', async () => {
+    vscode.commands.registerCommand('chapterwise.toggleFields', async () => {
       await treeProvider.toggleShowFields();
       const showFields = treeProvider.getShowFields();
       vscode.window.setStatusBarMessage(
@@ -87,7 +87,7 @@ export function registerNavigatorCommands(
 
   // Switch to INDEX mode command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.switchToIndexMode', async () => {
+    vscode.commands.registerCommand('chapterwise.switchToIndexMode', async () => {
       treeProvider.setNavigationMode('index');
 
       await vscode.commands.executeCommand('setContext', 'codexNavigatorMode', 'index');

@@ -1,5 +1,5 @@
 /**
- * Git Setup Wizard for ChapterWise Codex
+ * Git Setup Wizard for ChapterWise
  * Interactive wizard that guides users through complete Git setup
  */
 

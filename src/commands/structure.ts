@@ -13,7 +13,7 @@ export function registerStructureCommands(
   // Add child node command
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.addChildNode',
+      'chapterwise.addChildNode',
       async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) {
           vscode.window.showInformationMessage('Select a node to add a child to');
@@ -122,7 +122,7 @@ export function registerStructureCommands(
   // Add sibling node command
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.addSiblingNode',
+      'chapterwise.addSiblingNode',
       async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) {
           vscode.window.showInformationMessage('Select a node to add a sibling to');
@@ -228,7 +228,7 @@ export function registerStructureCommands(
   // Remove node command (move to trash)
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.removeNode',
+      'chapterwise.removeNode',
       async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) return;
 
@@ -285,7 +285,7 @@ export function registerStructureCommands(
   // Delete node permanently command
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.deleteNodePermanently',
+      'chapterwise.deleteNodePermanently',
       async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) return;
 
@@ -342,7 +342,7 @@ export function registerStructureCommands(
   // Rename node command
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.renameNode',
+      'chapterwise.renameNode',
       async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) return;
 
@@ -407,7 +407,7 @@ export function registerStructureCommands(
 
   // Duplicate node
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.duplicateNode', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.duplicateNode', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
       const { getStructureEditor } = await import('../structureEditor');
       const editor = getStructureEditor();
@@ -448,7 +448,7 @@ export function registerStructureCommands(
   // Move node up command
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.moveNodeUp',
+      'chapterwise.moveNodeUp',
       async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) return;
 
@@ -487,7 +487,7 @@ export function registerStructureCommands(
   // Move node down command
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.moveNodeDown',
+      'chapterwise.moveNodeDown',
       async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) return;
 
@@ -526,7 +526,7 @@ export function registerStructureCommands(
   // Change color command
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.changeColor',
+      'chapterwise.changeColor',
       async (treeItem?: CodexTreeItem) => {
         if (!treeItem) return;
 
@@ -547,7 +547,7 @@ export function registerStructureCommands(
 
   // Change node type
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.changeType', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.changeType', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
       const types = ['book', 'chapter', 'scene', 'character', 'location', 'item', 'event', 'note', 'world', 'faction', 'lore'];
       const picked = await vscode.window.showQuickPick(types, { placeHolder: 'Select node type' });
@@ -569,7 +569,7 @@ export function registerStructureCommands(
 
   // Change icon/emoji
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.changeIcon', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.changeIcon', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
       const emoji = await vscode.window.showInputBox({ prompt: 'Enter emoji', placeHolder: 'e.g., 📖 🗡️ 🏰' });
       if (!emoji) return;
@@ -590,7 +590,7 @@ export function registerStructureCommands(
 
   // Add field to node
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.addField', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.addField', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
       const { PROSE_FIELDS } = await import('../codexModel');
       const COMMON_FIELDS = [...PROSE_FIELDS, 'notes', 'synopsis'];
@@ -627,7 +627,7 @@ export function registerStructureCommands(
 
   // Delete field from node
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.deleteField', async (treeItem?: any) => {
+    vscode.commands.registerCommand('chapterwise.deleteField', async (treeItem?: any) => {
       if (!treeItem) return;
       const { getStructureEditor } = await import('../structureEditor');
       const editor = getStructureEditor();
@@ -649,7 +649,7 @@ export function registerStructureCommands(
 
   // Rename field on node
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.renameField', async (treeItem?: any) => {
+    vscode.commands.registerCommand('chapterwise.renameField', async (treeItem?: any) => {
       if (!treeItem) return;
       const { CodexFieldTreeItem: CFT } = await import('../treeProvider');
       let oldName: string | undefined;
@@ -678,7 +678,7 @@ export function registerStructureCommands(
 
   // Add tags to node
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.addTags', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.addTags', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
       const input = await vscode.window.showInputBox({ prompt: 'Enter tags (comma-separated)', placeHolder: 'e.g., action, drama, mystery' });
       if (!input) return;
@@ -701,7 +701,7 @@ export function registerStructureCommands(
 
   // Add relation to node
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.addRelation', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.addRelation', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
       const wsRoot = getWorkspaceRoot();
       if (!wsRoot) return;

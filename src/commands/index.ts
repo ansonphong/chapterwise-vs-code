@@ -11,21 +11,21 @@ export function registerIndexCommands(
 ): void {
   // Generate Index command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.generateIndex', async () => {
+    vscode.commands.registerCommand('chapterwise.generateIndex', async () => {
       await runGenerateIndex();
     })
   );
 
   // Regenerate Index command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.regenerateIndex', async () => {
+    vscode.commands.registerCommand('chapterwise.regenerateIndex', async () => {
       await runRegenerateIndex();
     })
   );
 
   // Create Index File command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.createIndexFile', async () => {
+    vscode.commands.registerCommand('chapterwise.createIndexFile', async () => {
       await runCreateIndexFile();
     })
   );
@@ -33,7 +33,7 @@ export function registerIndexCommands(
   // Open Index File command
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.openIndexFile',
+      'chapterwise.openIndexFile',
       async (treeItem?: IndexNodeTreeItem) => {
         if (!treeItem) {
           return;

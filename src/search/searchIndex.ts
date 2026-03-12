@@ -1,6 +1,6 @@
 /**
  * Search Index Types
- * Defines the structure for the search index used by ChapterWise Codex
+ * Defines the structure for the search index used by ChapterWise
  */
 
 /**

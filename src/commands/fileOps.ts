@@ -11,7 +11,7 @@ export function registerFileOpsCommands(
 
   // Add child file (index folders)
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.addChildFile', async (treeItem?: IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.addChildFile', async (treeItem?: IndexNodeTreeItem) => {
       if (!treeItem) return;
       const nodeKind = (treeItem.indexNode as any)._node_kind;
       if (nodeKind !== 'folder') return;
@@ -48,7 +48,7 @@ export function registerFileOpsCommands(
 
   // Add child folder (subfolder)
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.addChildFolder', async (treeItem?: IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.addChildFolder', async (treeItem?: IndexNodeTreeItem) => {
       if (!treeItem) return;
       const nodeKind = (treeItem.indexNode as any)._node_kind;
       if (nodeKind !== 'folder') return;
@@ -77,7 +77,7 @@ export function registerFileOpsCommands(
 
   // Rename folder
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.renameFolder', async (treeItem?: IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.renameFolder', async (treeItem?: IndexNodeTreeItem) => {
       if (!treeItem) return;
       const nodeKind = (treeItem.indexNode as any)._node_kind;
       if (nodeKind !== 'folder') return;
@@ -116,7 +116,7 @@ export function registerFileOpsCommands(
 
   // Extract node to file
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.extractToFile', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.extractToFile', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
       const wsRoot = getWorkspaceRoot();
       if (!wsRoot) return;
@@ -139,7 +139,7 @@ export function registerFileOpsCommands(
 
   // Inline This File (reverse of extractToFile)
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.inlineThisFile', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.inlineThisFile', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
       let doc: vscode.TextDocument;
       let node: any;
@@ -192,7 +192,7 @@ export function registerFileOpsCommands(
 
   // Open in file explorer
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.openInFinder', async (treeItem?: IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.openInFinder', async (treeItem?: IndexNodeTreeItem) => {
       if (!treeItem) return;
       const wsRoot = getWorkspaceRoot();
       if (!wsRoot) return;

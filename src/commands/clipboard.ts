@@ -30,7 +30,7 @@ export function registerClipboardCommands(
   // Copy ID command
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.copyId',
+      'chapterwise.copyId',
       async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
         if (!treeItem) {
           vscode.window.showInformationMessage('No ID to copy');
@@ -59,7 +59,7 @@ export function registerClipboardCommands(
 
   // Copy path (index files/folders only)
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.copyPath', async (treeItem?: IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.copyPath', async (treeItem?: IndexNodeTreeItem) => {
       if (!treeItem) return;
       const cp = treeItem.indexNode._computed_path;
       if (!cp) return;
@@ -70,7 +70,7 @@ export function registerClipboardCommands(
 
   // Cut node (store in clipboard)
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.cutNode', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.cutNode', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
       const cb = await getClipboard();
       if (treeItem instanceof CodexTreeItem) {
@@ -101,7 +101,7 @@ export function registerClipboardCommands(
 
   // Paste node as child
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.pasteNodeAsChild', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.pasteNodeAsChild', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
       const cb = await getClipboard();
       const entry = cb.getCutEntry();
@@ -133,7 +133,7 @@ export function registerClipboardCommands(
 
   // Paste node as sibling
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.pasteNodeAsSibling', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.pasteNodeAsSibling', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
       const cb = await getClipboard();
       const entry = cb.getCutEntry();

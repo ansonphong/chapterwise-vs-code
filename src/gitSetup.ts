@@ -1,5 +1,5 @@
 /**
- * Git Setup Utilities for ChapterWise Codex
+ * Git Setup Utilities for ChapterWise
  * Provides Git initialization, .gitignore management, and Git LFS setup
  */
 

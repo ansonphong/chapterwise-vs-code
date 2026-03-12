@@ -550,7 +550,7 @@ let outputChannel: vscode.OutputChannel | undefined;
 
 function getOutputChannel(): vscode.OutputChannel {
   if (!outputChannel) {
-    outputChannel = vscode.window.createOutputChannel('ChapterWise Codex Exploder');
+    outputChannel = vscode.window.createOutputChannel('ChapterWise Exploder');
   }
   return outputChannel;
 }

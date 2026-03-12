@@ -8,14 +8,14 @@ export function registerConvertCommands(
 ): void {
   // Convert to Markdown command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.convertToMarkdown', async () => {
+    vscode.commands.registerCommand('chapterwise.convertToMarkdown', async () => {
       await runConvertToMarkdown();
     })
   );
 
   // Convert Markdown to Codex command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.convertToCodex', async () => {
+    vscode.commands.registerCommand('chapterwise.convertToCodex', async () => {
       await runConvertToCodex();
     })
   );

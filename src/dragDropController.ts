@@ -1,5 +1,5 @@
 /**
- * Drag and Drop Controller for Codex Navigator
+ * Drag and Drop Controller for ChapterWise Navigator
  * Handles multi-selection drag & drop with best-effort processing
  */
 
@@ -35,8 +35,8 @@ interface DropResult {
  * Drag and Drop Controller for tree view
  */
 export class CodexDragAndDropController implements vscode.TreeDragAndDropController<CodexTreeItemType> {
-  dropMimeTypes = ['application/vnd.code.tree.chapterwiseCodexNavigator'];
-  dragMimeTypes = ['application/vnd.code.tree.chapterwiseCodexNavigator'];
+  dropMimeTypes = ['application/vnd.code.tree.chapterwiseNavigator'];
+  dragMimeTypes = ['application/vnd.code.tree.chapterwiseNavigator'];
 
   private outputChannel: vscode.OutputChannel | undefined;
 
@@ -56,7 +56,7 @@ export class CodexDragAndDropController implements vscode.TreeDragAndDropControl
    */
   private getOutputChannel(): vscode.OutputChannel {
     if (!this.outputChannel) {
-      this.outputChannel = vscode.window.createOutputChannel('Codex Navigator');
+      this.outputChannel = vscode.window.createOutputChannel('ChapterWise Navigator');
     }
     return this.outputChannel;
   }
@@ -134,7 +134,7 @@ export class CodexDragAndDropController implements vscode.TreeDragAndDropControl
     });
     
     dataTransfer.set(
-      'application/vnd.code.tree.chapterwiseCodexNavigator',
+      'application/vnd.code.tree.chapterwiseNavigator',
       new vscode.DataTransferItem(dragData)
     );
   }
@@ -147,7 +147,7 @@ export class CodexDragAndDropController implements vscode.TreeDragAndDropControl
     dataTransfer: vscode.DataTransfer,
     token: vscode.CancellationToken
   ): Promise<void> {
-    const transferItem = dataTransfer.get('application/vnd.code.tree.chapterwiseCodexNavigator');
+    const transferItem = dataTransfer.get('application/vnd.code.tree.chapterwiseNavigator');
     if (!transferItem) {
       return;
     }
@@ -175,7 +175,7 @@ export class CodexDragAndDropController implements vscode.TreeDragAndDropControl
     dataTransfer: vscode.DataTransfer,
     token: vscode.CancellationToken
   ): Promise<boolean | vscode.DocumentDropEdit> {
-    const transferItem = dataTransfer.get('application/vnd.code.tree.chapterwiseCodexNavigator');
+    const transferItem = dataTransfer.get('application/vnd.code.tree.chapterwiseNavigator');
     if (!transferItem) {
       return false;
     }

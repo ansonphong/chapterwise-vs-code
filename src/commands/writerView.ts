@@ -14,13 +14,13 @@ export function registerWriterViewCommands(
   // Open Writer View command
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.openWriterView',
+      'chapterwise.openWriterView',
       async (treeItem?: CodexTreeItem) => {
         if (treeItem) {
           await writerViewManager.openWriterView(treeItem);
         } else {
           vscode.window.showInformationMessage(
-            'Select a node in the Codex Navigator to open Writer View'
+            'Select a node in the ChapterWise Navigator to open Writer View'
           );
         }
       }
@@ -30,7 +30,7 @@ export function registerWriterViewCommands(
   // Open Writer View for a specific field
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.openWriterViewForField',
+      'chapterwise.openWriterViewForField',
       async (fieldItem?: CodexFieldTreeItem) => {
         if (!fieldItem) {
           return;
@@ -53,7 +53,7 @@ export function registerWriterViewCommands(
   // Open Index File in Writer View command (for .md Codex Lite files)
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.openIndexFileInWriterView',
+      'chapterwise.openIndexFileInWriterView',
       async (treeItem?: IndexNodeTreeItem) => {
         if (!treeItem) {
           outputChannel.appendLine('openIndexFileInWriterView: No treeItem provided');

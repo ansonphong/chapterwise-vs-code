@@ -19,18 +19,18 @@ suite('Tree Provider Integration', () => {
     await vscode.window.showTextDocument(doc);
     await new Promise(r => setTimeout(r, 500));
 
-    await vscode.commands.executeCommand('chapterwiseCodex.refresh');
+    await vscode.commands.executeCommand('chapterwise.refresh');
   });
 
   test('setContextFile populates tree with document content', async () => {
-    await vscode.commands.executeCommand('chapterwiseCodex.setContextFile', codexUri);
+    await vscode.commands.executeCommand('chapterwise.setContextFile', codexUri);
 
     await new Promise(r => setTimeout(r, 2000));
 
     // If context was accepted, a second call should also succeed
-    await vscode.commands.executeCommand('chapterwiseCodex.setContextFile', codexUri);
+    await vscode.commands.executeCommand('chapterwise.setContextFile', codexUri);
 
     // Refresh after context is set should complete
-    await vscode.commands.executeCommand('chapterwiseCodex.refresh');
+    await vscode.commands.executeCommand('chapterwise.refresh');
   });
 });

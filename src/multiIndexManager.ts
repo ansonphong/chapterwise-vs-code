@@ -210,7 +210,7 @@ export class MultiIndexManager {
     const hasMultiple = subIndexes.length > 0;
     vscode.commands.executeCommand(
       'setContext',
-      'chapterwiseCodex.hasMultipleIndexes',
+      'chapterwise.hasMultipleIndexes',
       hasMultiple
     );
 
@@ -220,7 +220,7 @@ export class MultiIndexManager {
         index.viewSlot = i;
         vscode.commands.executeCommand(
           'setContext',
-          `chapterwiseCodex.index${i}Visible`,
+          `chapterwise.index${i}Visible`,
           true
         );
       }
@@ -230,7 +230,7 @@ export class MultiIndexManager {
     for (let i = subIndexes.length; i < 8; i++) {
       vscode.commands.executeCommand(
         'setContext',
-        `chapterwiseCodex.index${i}Visible`,
+        `chapterwise.index${i}Visible`,
         false
       );
     }
@@ -268,7 +268,7 @@ export class MultiIndexManager {
    * Check if multi-index mode is active
    */
   isMultiIndexMode(): boolean {
-    const config = vscode.workspace.getConfiguration('chapterwiseCodex');
+    const config = vscode.workspace.getConfiguration('chapterwise');
     const mode = config.get<string>('indexDisplayMode', 'stacked');
     return mode === 'stacked' && this.getSubIndexes().length > 0;
   }

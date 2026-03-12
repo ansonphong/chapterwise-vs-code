@@ -15,7 +15,7 @@ let diagnosticCollection: vscode.DiagnosticCollection;
  * Initialize validation system
  */
 export function initializeValidation(context: vscode.ExtensionContext): void {
-  diagnosticCollection = vscode.languages.createDiagnosticCollection('chapterwiseCodex');
+  diagnosticCollection = vscode.languages.createDiagnosticCollection('chapterwise');
   context.subscriptions.push(diagnosticCollection);
   
   // Validate on open
@@ -106,7 +106,7 @@ function validateDocument(document: vscode.TextDocument): void {
         : vscode.DiagnosticSeverity.Information;
     
     const diagnostic = new vscode.Diagnostic(range, issue.message, severity);
-    diagnostic.source = 'ChapterWise Codex';
+    diagnostic.source = 'ChapterWise';
     
     // Add code for quick-fix matching
     if (issue.message.includes('metadata')) {
@@ -160,7 +160,7 @@ function validateMarkdownDocument(document: vscode.TextDocument): void {
     }
   }
   
-  diagnostics.forEach(d => d.source = 'ChapterWise Codex Lite');
+  diagnostics.forEach(d => d.source = 'ChapterWise Lite');
   diagnosticCollection.set(document.uri, diagnostics);
 }
 
@@ -180,7 +180,7 @@ class CodexCodeActionProvider implements vscode.CodeActionProvider {
     const actions: vscode.CodeAction[] = [];
     
     for (const diagnostic of context.diagnostics) {
-      if (diagnostic.source !== 'ChapterWise Codex') {
+      if (diagnostic.source !== 'ChapterWise') {
         continue;
       }
       
@@ -220,7 +220,7 @@ class CodexCodeActionProvider implements vscode.CodeActionProvider {
     // Use command instead of edit - auto-fixer handles the complexity
     action.command = {
       title: 'Run Auto-Fix',
-      command: 'chapterwiseCodex.autoFix'
+      command: 'chapterwise.autoFix'
     };
 
     return action;
@@ -378,7 +378,7 @@ class MarkdownCodeActionProvider implements vscode.CodeActionProvider {
     const actions: vscode.CodeAction[] = [];
     
     for (const diagnostic of context.diagnostics) {
-      if (diagnostic.source !== 'ChapterWise Codex Lite') {
+      if (diagnostic.source !== 'ChapterWise Lite') {
         continue;
       }
       

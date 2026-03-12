@@ -245,8 +245,8 @@ export async function restoreLastContext(context: vscode.ExtensionContext): Prom
   const RESTORE_TIMEOUT_MS = 10000;
 
   try {
-    const savedContextPath = context.workspaceState.get<string>('chapterwiseCodex.lastContextPath');
-    const savedContextType = context.workspaceState.get<string>('chapterwiseCodex.lastContextType');
+    const savedContextPath = context.workspaceState.get<string>('chapterwise.lastContextPath');
+    const savedContextType = context.workspaceState.get<string>('chapterwise.lastContextType');
 
     if (!savedContextPath || !savedContextType) {
       return;
@@ -256,8 +256,8 @@ export async function restoreLastContext(context: vscode.ExtensionContext): Prom
 
     if (!fs.existsSync(savedContextPath)) {
       outputChannel.appendLine(`[restoreLastContext] Saved context path no longer exists: ${savedContextPath}`);
-      await context.workspaceState.update('chapterwiseCodex.lastContextPath', undefined);
-      await context.workspaceState.update('chapterwiseCodex.lastContextType', undefined);
+      await context.workspaceState.update('chapterwise.lastContextPath', undefined);
+      await context.workspaceState.update('chapterwise.lastContextType', undefined);
       return;
     }
 
@@ -271,14 +271,14 @@ export async function restoreLastContext(context: vscode.ExtensionContext): Prom
     if (savedContextType === 'folder') {
       outputChannel.appendLine(`[restoreLastContext] Restoring folder context: ${savedContextPath}`);
       await withTimeout(
-        Promise.resolve(vscode.commands.executeCommand('chapterwiseCodex.setContextFolder', uri)),
+        Promise.resolve(vscode.commands.executeCommand('chapterwise.setContextFolder', uri)),
         RESTORE_TIMEOUT_MS,
         'Timeout restoring folder context'
       );
     } else if (savedContextType === 'file') {
       outputChannel.appendLine(`[restoreLastContext] Restoring file context: ${savedContextPath}`);
       await withTimeout(
-        Promise.resolve(vscode.commands.executeCommand('chapterwiseCodex.setContextFile', uri)),
+        Promise.resolve(vscode.commands.executeCommand('chapterwise.setContextFile', uri)),
         RESTORE_TIMEOUT_MS,
         'Timeout restoring file context'
       );
@@ -304,7 +304,7 @@ export async function autoDiscoverIndexFiles(): Promise<void> {
 
     for (const entry of entries) {
       if (entry.isSymbolicLink()) {
-        console.log(`[ChapterWise Codex] Skipping symlink during discovery: ${entry.name}`);
+        console.log(`[ChapterWise] Skipping symlink during discovery: ${entry.name}`);
         continue;
       }
 
@@ -313,17 +313,17 @@ export async function autoDiscoverIndexFiles(): Promise<void> {
         const indexPath = path.join(folderPath, 'index.codex.yaml');
 
         if (fs.existsSync(indexPath)) {
-          console.log(`[ChapterWise Codex] Found index at top level: ${entry.name}/index.codex.yaml`);
+          console.log(`[ChapterWise] Found index at top level: ${entry.name}/index.codex.yaml`);
         }
       }
     }
 
     const rootIndexPath = path.join(workspaceRoot, '.index.codex.json');
     if (fs.existsSync(rootIndexPath)) {
-      console.log(`[ChapterWise Codex] Found workspace root index: .index.codex.json`);
+      console.log(`[ChapterWise] Found workspace root index: .index.codex.json`);
     }
   } catch (error) {
-    console.error('[ChapterWise Codex] Error during auto-discovery:', error);
+    console.error('[ChapterWise] Error during auto-discovery:', error);
   }
 }
 
@@ -339,7 +339,7 @@ export function syncOrderingOnStartup(): void {
         const om = getOrderingManager(wsRoot);
         await om.syncWithFilesystem();
       } catch (e) {
-        console.error('[ChapterWise Codex] Failed to sync ordering index:', e);
+        console.error('[ChapterWise] Failed to sync ordering index:', e);
       }
     })();
   }
@@ -364,7 +364,7 @@ export function updateStatusBar(): void {
       const typeCount = codexDoc?.types.size ?? 0;
 
       statusBarItem.text = `$(book) Codex: ${nodeCount} nodes`;
-      statusBarItem.tooltip = `ChapterWise Codex\n${nodeCount} nodes, ${typeCount} types\nClick to open Navigator`;
+      statusBarItem.tooltip = `ChapterWise\n${nodeCount} nodes, ${typeCount} types\nClick to open Navigator`;
     }
     statusBarItem.show();
   } else {

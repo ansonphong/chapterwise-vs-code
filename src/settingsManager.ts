@@ -249,7 +249,7 @@ export class NavigatorSettingsManager {
    * Extract settings from VS Code configuration
    */
   private getVSCodeSettings(): Partial<NavigatorSettings> {
-    const config = vscode.workspace.getConfiguration('chapterwiseCodex.navigator');
+    const config = vscode.workspace.getConfiguration('chapterwise.navigator');
     
     const settings: Partial<NavigatorSettings> = {};
     

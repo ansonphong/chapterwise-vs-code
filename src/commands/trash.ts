@@ -11,7 +11,7 @@ export function registerTrashCommands(
 
   // Move to trash
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.moveToTrash', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
+    vscode.commands.registerCommand('chapterwise.moveToTrash', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
       if (treeItem instanceof IndexNodeTreeItem) {
         const wsRoot = getWorkspaceRoot();
@@ -54,7 +54,7 @@ export function registerTrashCommands(
 
   // Restore from trash
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.restoreFromTrash', async () => {
+    vscode.commands.registerCommand('chapterwise.restoreFromTrash', async () => {
       const wsRoot = getWorkspaceRoot();
       if (!wsRoot) return;
       const { TrashManager } = await import('../trashManager');
@@ -73,7 +73,7 @@ export function registerTrashCommands(
 
   // Empty trash
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.emptyTrash', async () => {
+    vscode.commands.registerCommand('chapterwise.emptyTrash', async () => {
       const wsRoot = getWorkspaceRoot();
       if (!wsRoot) return;
       const { TrashManager } = await import('../trashManager');

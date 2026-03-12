@@ -1,4 +1,4 @@
-# ChapterWise Codex Extension
+# ChapterWise Extension
 
 **A VS Code Extension (also works with Cursor)**
 
@@ -8,7 +8,7 @@ ChapterWise turns your code editor into a writing app with tree navigation, dist
 
 ## Features
 
-### 📚 Codex Navigator (Tree View)
+### 📚 ChapterWise Navigator (Tree View)
 
 A sidebar tree view showing all nodes in your Codex file:
 
@@ -52,7 +52,7 @@ Extract child nodes into separate files for modular organization:
 - **Include directives** — automatically replaces extracted nodes with `include:` references
 - **Git-friendly** — perfect for version control and collaboration
 
-**Command:** `ChapterWise Codex: Explode Codex`
+**Command:** `ChapterWise: Explode Codex`
 
 ### 🔄 Implode Codex
 
@@ -64,7 +64,7 @@ Merge included files back into the parent document:
 - **Empty folder removal** — cleans up folders that become empty
 - **Dry run mode** — preview what will be merged
 
-**Command:** `ChapterWise Codex: Implode Codex (Merge Included Files)`
+**Command:** `ChapterWise: Implode Codex (Merge Included Files)`
 
 ### 📊 Update Word Count
 
@@ -75,7 +75,7 @@ Track word counts across your manuscript:
 - **Recursive counting** — processes all children
 - **Include support** — optionally count words in included files
 
-**Command:** `ChapterWise Codex: Update Word Count`
+**Command:** `ChapterWise: Update Word Count`
 
 ### 🏷️ Generate Tags
 
@@ -93,7 +93,7 @@ AI-powered tag extraction from your content:
   - Min occurrences threshold
   - Follow includes
 
-**Command:** `ChapterWise Codex: Generate Tags`
+**Command:** `ChapterWise: Generate Tags`
 
 ### 📝 Snippets
 
@@ -113,7 +113,7 @@ Quick templates for common node types:
 
 1. **Install the extension** in VS Code or Cursor (from VSIX or marketplace)
 2. **Open a `.codex.yaml` file** (or create one using snippets)
-3. **Click the Codex icon** in the activity bar to open the Navigator
+3. **Click the ChapterWise icon** in the activity bar to open the Navigator
 4. **Click any node** to navigate to it in the editor
 5. **Use commands** via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`)
 
@@ -123,11 +123,11 @@ Access all commands via the Command Palette:
 
 | Command | Description |
 |---------|-------------|
-| `ChapterWise Codex: Explode Codex` | Extract children to separate files |
-| `ChapterWise Codex: Implode Codex` | Merge included files back |
-| `ChapterWise Codex: Update Word Count` | Count words in body fields |
-| `ChapterWise Codex: Generate Tags` | Extract tags from content |
-| `ChapterWise Codex: Open Writer's View` | Focused writing mode |
+| `ChapterWise: Explode Codex` | Extract children to separate files |
+| `ChapterWise: Implode Codex` | Merge included files back |
+| `ChapterWise: Update Word Count` | Count words in body fields |
+| `ChapterWise: Generate Tags` | Extract tags from content |
+| `ChapterWise: Open Writer's View` | Focused writing mode |
 
 ## Keyboard Shortcuts
 
@@ -135,7 +135,7 @@ Access all commands via the Command Palette:
 |----------|--------|
 | `Cmd/Ctrl+Shift+P` | Open Command Palette |
 | `Cmd/Ctrl+Shift+W` | Open Writer View for current node |
-| `Cmd/Ctrl+Shift+E` | Focus Explorer (Codex Tree) |
+| `Cmd/Ctrl+Shift+E` | Focus Explorer (ChapterWise Tree) |
 | `Cmd/Ctrl+S` (in Writer) | Save changes |
 | `Cmd/Ctrl+.` | Quick fix suggestions |
 
@@ -239,10 +239,10 @@ npm run compile
 npm run package
 
 # Install in VS Code
-code --install-extension chapterwise-codex-0.3.2.vsix --force
+code --install-extension chapterwise-0.3.2.vsix --force
 
 # Install in Cursor
-cursor --install-extension chapterwise-codex-0.3.2.vsix --force
+cursor --install-extension chapterwise-0.3.2.vsix --force
 ```
 
 ## Documentation

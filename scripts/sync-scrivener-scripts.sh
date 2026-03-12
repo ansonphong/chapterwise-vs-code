@@ -5,7 +5,7 @@
 set -e
 
 CANONICAL="/Users/phong/Projects/chapterwise-claude-plugins/plugins/chapterwise-codex/scripts"
-TARGET="/Users/phong/Projects/chapterwise-codex/scripts/scrivener"
+TARGET="/Users/phong/Projects/chapterwise-vs-code/scripts/scrivener"
 
 FILES=(
     "scrivener_import.py"

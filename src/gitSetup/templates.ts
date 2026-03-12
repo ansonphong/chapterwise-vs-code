@@ -1,6 +1,6 @@
 /**
  * Templates for .gitignore and .gitattributes files
- * Optimized for writing projects using ChapterWise Codex
+ * Optimized for writing projects using ChapterWise
  */
 
 /**

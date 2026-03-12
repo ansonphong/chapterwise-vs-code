@@ -17,7 +17,7 @@ import YAML from 'yaml';
 import { minimatch } from 'minimatch';
 
 /**
- * Helper to log to the ChapterWise Codex output channel
+ * Helper to log to the ChapterWise output channel
  */
 function log(message: string): void {
   // Import dynamically to avoid circular dependency

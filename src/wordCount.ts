@@ -535,7 +535,7 @@ let outputChannel: vscode.OutputChannel | undefined;
 
 function getOutputChannel(): vscode.OutputChannel {
   if (!outputChannel) {
-    outputChannel = vscode.window.createOutputChannel('ChapterWise Codex Word Count');
+    outputChannel = vscode.window.createOutputChannel('ChapterWise Word Count');
   }
   return outputChannel;
 }

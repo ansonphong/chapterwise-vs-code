@@ -222,7 +222,7 @@ export class WriterViewManager {
    * Get the theme setting from configuration
    */
   private getThemeSetting(): 'light' | 'dark' | 'system' | 'theme' {
-    const config = vscode.workspace.getConfiguration('chapterwiseCodex.writerView');
+    const config = vscode.workspace.getConfiguration('chapterwise.writerView');
     return config.get<'light' | 'dark' | 'system' | 'theme'>('theme', 'theme');
   }
 
@@ -351,7 +351,7 @@ export class WriterViewManager {
     const workspaceRoot = this.getWorkspaceRoot();
 
     const panel = vscode.window.createWebviewPanel(
-      'chapterwiseCodexWriter',
+      'chapterwiseWriter',
       `🖋️ ${node.name || 'Writer'}`,
       vscode.ViewColumn.Active,
       {
@@ -538,7 +538,7 @@ export class WriterViewManager {
     });
 
     const configChangeDisposable = vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('chapterwiseCodex.writerView.theme')) {
+      if (e.affectsConfiguration('chapterwise.writerView.theme')) {
         const themeSetting = this.getThemeSetting();
         const vscodeThemeKind = this.getVSCodeThemeKind();
         safePostMessage(panel, { type: 'themeChanged', themeSetting, vscodeTheme: vscodeThemeKind });
@@ -1586,7 +1586,7 @@ export class WriterViewManager {
    * Get the target images directory based on user settings
    */
   private getImagesDirectory(documentUri: vscode.Uri, node: CodexNode, workspaceRoot: string): string {
-    const config = vscode.workspace.getConfiguration('chapterwiseCodex');
+    const config = vscode.workspace.getConfiguration('chapterwise');
     const organization = config.get<string>('images.organization', 'sharedWithNodeFolders');
 
     const codexDir = path.dirname(documentUri.fsPath);

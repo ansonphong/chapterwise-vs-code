@@ -16,7 +16,7 @@ export function registerToolsCommands(
 
   // Auto-Fix command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.autoFix', async () => {
+    vscode.commands.registerCommand('chapterwise.autoFix', async () => {
       await runAutoFixer(false);
       treeProvider.refresh();
     })
@@ -24,7 +24,7 @@ export function registerToolsCommands(
 
   // Auto-Fix with ID regeneration command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.autoFixRegenIds', async () => {
+    vscode.commands.registerCommand('chapterwise.autoFixRegenIds', async () => {
       await runAutoFixer(true);
       treeProvider.refresh();
     })
@@ -32,7 +32,7 @@ export function registerToolsCommands(
 
   // Explode Codex command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.explodeCodex', async () => {
+    vscode.commands.registerCommand('chapterwise.explodeCodex', async () => {
       await runExplodeCodex();
       treeProvider.refresh();
     })
@@ -40,7 +40,7 @@ export function registerToolsCommands(
 
   // Implode Codex command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.implodeCodex', async () => {
+    vscode.commands.registerCommand('chapterwise.implodeCodex', async () => {
       await runImplodeCodex();
       treeProvider.refresh();
     })
@@ -48,7 +48,7 @@ export function registerToolsCommands(
 
   // Update Word Count command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.updateWordCount', async () => {
+    vscode.commands.registerCommand('chapterwise.updateWordCount', async () => {
       await runUpdateWordCount();
       treeProvider.refresh();
     })
@@ -56,7 +56,7 @@ export function registerToolsCommands(
 
   // Generate Tags command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.generateTags', async () => {
+    vscode.commands.registerCommand('chapterwise.generateTags', async () => {
       await runGenerateTags();
       treeProvider.refresh();
     })
@@ -64,7 +64,7 @@ export function registerToolsCommands(
 
   // Autofix Folder command
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.autofixFolder', async (item: any) => {
+    vscode.commands.registerCommand('chapterwise.autofixFolder', async (item: any) => {
       if (!item || !item.indexNode) {
         vscode.window.showErrorMessage('No folder selected');
         return;

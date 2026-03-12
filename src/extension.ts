@@ -1,5 +1,5 @@
 /**
- * ChapterWise Codex Extension
+ * ChapterWise Extension
  * Transform .codex.yaml and .codex.json editing into a Scrivener-like writing experience
  */
 
@@ -30,10 +30,10 @@ export { getOutputChannel, getSearchIndexManager, log } from './extensionState';
  * Extension activation
  */
 export function activate(context: vscode.ExtensionContext): void {
-  const outputChannel = vscode.window.createOutputChannel('ChapterWise Codex');
+  const outputChannel = vscode.window.createOutputChannel('ChapterWise');
   context.subscriptions.push(outputChannel);
 
-  outputChannel.appendLine('ChapterWise Codex extension activating...');
+  outputChannel.appendLine('ChapterWise extension activating...');
 
   try {
     // Create tree provider
@@ -71,7 +71,7 @@ export function activate(context: vscode.ExtensionContext): void {
     try {
       multiIndexManager = new MultiIndexManager(context);
       masterTreeProvider = new MasterIndexTreeProvider();
-      const masterView = vscode.window.createTreeView('chapterwiseCodexMaster', {
+      const masterView = vscode.window.createTreeView('chapterwiseMaster', {
         treeDataProvider: masterTreeProvider,
         showCollapseAll: true,
         canSelectMany: true
@@ -79,9 +79,9 @@ export function activate(context: vscode.ExtensionContext): void {
       context.subscriptions.push(masterView);
 
       for (let i = 0; i < 8; i++) {
-        const provider = new SubIndexTreeProvider(`chapterwiseCodexIndex${i}`);
+        const provider = new SubIndexTreeProvider(`chapterwiseIndex${i}`);
         subIndexProviders.push(provider);
-        const view = vscode.window.createTreeView(`chapterwiseCodexIndex${i}`, {
+        const view = vscode.window.createTreeView(`chapterwiseIndex${i}`, {
           treeDataProvider: provider,
           showCollapseAll: true,
           canSelectMany: true
@@ -112,7 +112,7 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.StatusBarAlignment.Right,
       100
     );
-    statusBarItem.command = 'chapterwiseCodex.openNavigator';
+    statusBarItem.command = 'chapterwise.openNavigator';
     context.subscriptions.push(statusBarItem);
 
     // Initialize shared state
@@ -141,10 +141,10 @@ export function activate(context: vscode.ExtensionContext): void {
     autoDiscoverIndexFiles();
     restoreLastContext(context);
 
-    console.log('ChapterWise Codex extension activated successfully!');
+    console.log('ChapterWise extension activated successfully!');
   } catch (error) {
-    console.error('ChapterWise Codex activation failed:', error);
-    vscode.window.showErrorMessage(`ChapterWise Codex failed to activate: ${error}`);
+    console.error('ChapterWise activation failed:', error);
+    vscode.window.showErrorMessage(`ChapterWise failed to activate: ${error}`);
   }
 }
 

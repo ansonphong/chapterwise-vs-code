@@ -14,7 +14,7 @@ export function registerNavigationCommands(
   // Go to YAML command
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.goToYaml',
+      'chapterwise.goToYaml',
       async (treeItem?: CodexTreeItem | IndexNodeTreeItem | CodexFieldTreeItem) => {
         if (!treeItem) return;
 
@@ -62,7 +62,7 @@ export function registerNavigationCommands(
   // Navigate to Entity command (opens Writer View)
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.navigateToEntity',
+      'chapterwise.navigateToEntity',
       async (treeItem?: IndexNodeTreeItem) => {
         if (!treeItem) {
           vscode.window.showErrorMessage('No node selected');
@@ -131,7 +131,7 @@ export function registerNavigationCommands(
   // Navigate to Field command (opens Writer View)
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.navigateToField',
+      'chapterwise.navigateToField',
       async (treeItem?: IndexNodeTreeItem) => {
         if (!treeItem) {
           vscode.window.showErrorMessage('No field selected');
@@ -206,7 +206,7 @@ export function registerNavigationCommands(
   // but also called with a plain string node ID from the search command via executeCommand.
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.navigateToNode',
+      'chapterwise.navigateToNode',
       async (arg?: IndexNodeTreeItem | { nodeId: string; parentFile: string }) => {
         let targetNodeId: string | undefined;
         let parentFile: string | undefined;
@@ -289,7 +289,7 @@ export function registerNavigationCommands(
   // Navigate to Entity in Code View
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.navigateToEntityInCodeView',
+      'chapterwise.navigateToEntityInCodeView',
       async (treeItem?: IndexNodeTreeItem) => {
         if (!treeItem) {
           vscode.window.showErrorMessage('No node selected');
@@ -359,15 +359,15 @@ export function registerNavigationCommands(
 
   // Backward-compat alias
   context.subscriptions.push(
-    vscode.commands.registerCommand('chapterwiseCodex.navigateToNodeInCodeView',
-      (...args: any[]) => vscode.commands.executeCommand('chapterwiseCodex.navigateToEntityInCodeView', ...args)
+    vscode.commands.registerCommand('chapterwise.navigateToNodeInCodeView',
+      (...args: any[]) => vscode.commands.executeCommand('chapterwise.navigateToEntityInCodeView', ...args)
     )
   );
 
   // Navigate to Field in Code View
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.navigateToFieldInCodeView',
+      'chapterwise.navigateToFieldInCodeView',
       async (treeItem?: IndexNodeTreeItem) => {
         if (!treeItem) {
           vscode.window.showErrorMessage('No field selected');
@@ -456,7 +456,7 @@ export function registerNavigationCommands(
   // Show Error command (for missing/error nodes)
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      'chapterwiseCodex.showError',
+      'chapterwise.showError',
       async (treeItem?: IndexNodeTreeItem) => {
         if (!treeItem) {
           return;

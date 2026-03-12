@@ -1,5 +1,5 @@
 /**
- * Tree Provider - Codex Explorer sidebar navigation
+ * Tree Provider - ChapterWise Explorer sidebar navigation
  * Provides hierarchical tree view of all nodes in a Codex file
  */
 
@@ -139,7 +139,7 @@ export class CodexFieldTreeItem extends vscode.TreeItem {
 
     // Click opens Writer View for this specific field
     this.command = {
-      command: 'chapterwiseCodex.openWriterViewForField',
+      command: 'chapterwise.openWriterViewForField',
       title: 'Edit Field',
       arguments: [this],
     };
@@ -264,28 +264,28 @@ export class IndexNodeTreeItem extends vscode.TreeItem {
     if (isField) {
       // Field - navigate to specific field in writer view
       this.command = {
-        command: 'chapterwiseCodex.navigateToField',
+        command: 'chapterwise.navigateToField',
         title: '',
         arguments: [this],
       };
     } else if (isNode) {
       // Node - navigate to node in writer view
       this.command = {
-        command: 'chapterwiseCodex.navigateToNode',
+        command: 'chapterwise.navigateToNode',
         title: '',
         arguments: [this],
       };
     } else if (isFile) {
       // File - open in writer view
       this.command = {
-        command: 'chapterwiseCodex.openIndexFileInWriterView',
+        command: 'chapterwise.openIndexFileInWriterView',
         title: '',
         arguments: [this],
       };
     } else if (isMissing || isError) {
       // Missing/Error - show error message
       this.command = {
-        command: 'chapterwiseCodex.showError',
+        command: 'chapterwise.showError',
         title: '',
         arguments: [this],
       };
@@ -294,7 +294,7 @@ export class IndexNodeTreeItem extends vscode.TreeItem {
       const filename = indexNode._filename || '';
       if (filename.endsWith('.md') || filename.endsWith('.codex.yaml')) {
         this.command = {
-          command: 'chapterwiseCodex.openIndexFileInWriterView',
+          command: 'chapterwise.openIndexFileInWriterView',
           title: '',
           arguments: [this],
         };
@@ -524,7 +524,7 @@ export class CodexTreeItem extends vscode.TreeItem {
 
     // Double-click opens Writer View
     this.command = {
-      command: 'chapterwiseCodex.openWriterView',
+      command: 'chapterwise.openWriterView',
       title: 'Open Writer View',
       arguments: [this],
     };
@@ -596,7 +596,7 @@ export class CodexTreeItem extends vscode.TreeItem {
 export type NavigationMode = 'auto' | 'index' | 'files';
 
 /**
- * Provides data for the Codex Navigator tree view
+ * Provides data for the ChapterWise Navigator tree view
  */
 export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemType> {
   private _onDidChangeTreeData = new vscode.EventEmitter<CodexTreeItemType | undefined | null | void>();
@@ -694,7 +694,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
   }
 
   constructor() {
-    console.log('[ChapterWise Codex] TreeProvider constructor called');
+    console.log('[ChapterWise] TreeProvider constructor called');
 
     // Watch for document changes
     this.disposables.push(
@@ -727,7 +727,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
       })
     );
 
-    console.log('[ChapterWise Codex] TreeProvider initialized - context empty until explicitly set');
+    console.log('[ChapterWise] TreeProvider initialized - context empty until explicitly set');
   }
 
   /**
@@ -895,7 +895,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
 
       // Check if index exists
       if (!fs.existsSync(indexPath)) {
-        console.log('[ChapterWise Codex] Index not found, will be generated');
+        console.log('[ChapterWise] Index not found, will be generated');
         // Show loading state immediately
         this.isLoading = true;
         this.loadingMessage = `Generating index for ${path.basename(folderPath)}...`;
@@ -928,7 +928,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
 
         this.isIndexMode = true;
         this.refresh();
-        log('[ChapterWise Codex] Context folder index loaded and displayed');
+        log('[ChapterWise] Context folder index loaded and displayed');
       } catch (error) {
         log(`[TreeProvider] Error loading context index: ${error}`);
         // Clear stale state on failure
@@ -1013,7 +1013,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
    * Get whether fields should be shown in tree (from workspace settings)
    */
   getShowFields(): boolean {
-    const config = vscode.workspace.getConfiguration('chapterwiseCodex');
+    const config = vscode.workspace.getConfiguration('chapterwise');
     return config.get<boolean>('showFieldsInTree', true);
   }
 
@@ -1021,7 +1021,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
    * Get the current display mode
    */
   getDisplayMode(): string {
-    const config = vscode.workspace.getConfiguration('chapterwiseCodex');
+    const config = vscode.workspace.getConfiguration('chapterwise');
     return config.get<string>('indexDisplayMode', 'stacked');
   }
 
@@ -1036,7 +1036,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
    * Toggle field display and refresh tree
    */
   async toggleShowFields(): Promise<void> {
-    const config = vscode.workspace.getConfiguration('chapterwiseCodex');
+    const config = vscode.workspace.getConfiguration('chapterwise');
     const currentValue = config.get<boolean>('showFieldsInTree', true);
     await config.update('showFieldsInTree', !currentValue, vscode.ConfigurationTarget.Workspace);
     this.refresh();
@@ -1126,7 +1126,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
       return [new CodexFileHeaderItem(
         vscode.Uri.file(''),
         false,
-        'Right-click a folder \u2192 Set as Codex Context'
+        'Right-click a folder \u2192 Set as ChapterWise Context'
       )];
     }
 
@@ -1396,7 +1396,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
       // Get the file path
       const filePath = element.getFilePath();
 
-      console.log('[ChapterWise Codex] Attempting to load file structure:', {
+      console.log('[ChapterWise] Attempting to load file structure:', {
         filePath,
         workspaceRoot,
         _computed_path: element.indexNode._computed_path,
@@ -1404,7 +1404,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
       });
 
       if (!fs.existsSync(filePath)) {
-        console.error('[ChapterWise Codex] File not found:', filePath);
+        console.error('[ChapterWise] File not found:', filePath);
         return [];
       }
 
@@ -1413,11 +1413,11 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
       const codexDoc = parseCodex(fileContent);
 
       if (!codexDoc || !codexDoc.rootNode) {
-        console.error('[ChapterWise Codex] Failed to parse codex file:', filePath);
+        console.error('[ChapterWise] Failed to parse codex file:', filePath);
         return [];
       }
 
-      console.log('[ChapterWise Codex] Parsed codex file successfully:', {
+      console.log('[ChapterWise] Parsed codex file successfully:', {
         filePath,
         rootNodeType: codexDoc.rootNode.type,
         childrenCount: codexDoc.rootNode.children.length
@@ -1440,14 +1440,14 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
             false  // Don't show fields for now (just the structure)
           ))
         );
-        console.log('[ChapterWise Codex] Returning', items.length, 'child items');
+        console.log('[ChapterWise] Returning', items.length, 'child items');
         return items;
       }
 
-      console.log('[ChapterWise Codex] No children found in root node');
+      console.log('[ChapterWise] No children found in root node');
       return [];
     } catch (error) {
-      console.error('[ChapterWise Codex] Failed to load codex file structure:', error);
+      console.error('[ChapterWise] Failed to load codex file structure:', error);
       return [];
     }
   }
@@ -1469,7 +1469,7 @@ export function createCodexTreeView(
   treeProvider: CodexTreeProvider;
   treeView: vscode.TreeView<CodexTreeItemType>;
 } {
-  const treeView = vscode.window.createTreeView('chapterwiseCodexNavigator', {
+  const treeView = vscode.window.createTreeView('chapterwiseNavigator', {
     treeDataProvider: treeProvider,
     showCollapseAll: true,
     canSelectMany: true, // Enable multi-selection (Cmd+Click, Shift+Click)
