@@ -2,7 +2,7 @@
   "name": "chapterwise-codex",
   "displayName": "ChapterWise Codex",
   "description": "Codex file format Manuscript editing with tree navigation, distraction-free prose editing, and format validation.",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "publisher": "StudioPhong",
   "icon": "media/icon.png",
   "repository": {
@@ -529,11 +529,6 @@
           "group": "4_navigate@4"
         },
         {
-          "command": "chapterwiseCodex.inlineThisFile",
-          "when": "viewItem == codexNode",
-          "group": "4_navigate@5"
-        },
-        {
           "command": "chapterwiseCodex.moveToTrash",
           "when": "viewItem == codexNode",
           "group": "5_delete@1"
@@ -543,7 +538,6 @@
           "when": "viewItem == codexNode",
           "group": "5_delete@2"
         },
-
         {
           "command": "chapterwiseCodex.addChildNode",
           "when": "viewItem == indexNode",
@@ -635,16 +629,10 @@
           "group": "5_delete@2"
         },
         {
-          "command": "chapterwiseCodex.navigateToNode",
+          "command": "chapterwiseCodex.navigateToEntityInCodeView",
           "when": "viewItem == indexNode",
           "group": "navigation@1"
         },
-        {
-          "command": "chapterwiseCodex.navigateToEntityInCodeView",
-          "when": "viewItem == indexNode",
-          "group": "navigation@2"
-        },
-
         {
           "command": "chapterwiseCodex.addChildNode",
           "when": "viewItem == indexFile",
@@ -721,6 +709,11 @@
           "group": "4_navigate@3"
         },
         {
+          "command": "chapterwiseCodex.inlineThisFile",
+          "when": "viewItem == indexFile",
+          "group": "4_navigate@4"
+        },
+        {
           "command": "chapterwiseCodex.moveToTrash",
           "when": "viewItem == indexFile",
           "group": "5_delete@1"
@@ -730,7 +723,6 @@
           "when": "viewItem == indexFile",
           "group": "5_delete@2"
         },
-
         {
           "command": "chapterwiseCodex.addChildFile",
           "when": "viewItem == indexFolder",
@@ -756,7 +748,6 @@
           "when": "viewItem == indexFolder",
           "group": "5_delete@1"
         },
-
         {
           "command": "chapterwiseCodex.renameField",
           "when": "viewItem == codexField",
@@ -786,18 +777,12 @@
           "command": "chapterwiseCodex.deleteField",
           "when": "viewItem == indexField",
           "group": "5_delete@1"
-        },
-        {
-          "command": "chapterwiseCodex.navigateToField",
-          "when": "viewItem == indexField",
-          "group": "navigation@1"
         },
         {
           "command": "chapterwiseCodex.navigateToFieldInCodeView",
           "when": "viewItem == indexField",
-          "group": "navigation@2"
+          "group": "navigation@1"
         },
-
         {
           "command": "chapterwiseCodex.batchMoveToTrash",
           "when": "viewItem == codexNode && listMultiSelection",
@@ -1128,10 +1113,12 @@
     "watch": "node esbuild.js --watch",
     "compile:tsc": "tsc -p ./",
     "pretest": "npm run compile",
+    "typecheck": "tsc -p ./ --noEmit",
     "lint": "eslint src --ext ts",
     "package": "vsce package",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "npm run typecheck && vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "minimatch": "^9.0.0",
@@ -1141,6 +1128,7 @@
     "@types/minimatch": "^5.1.0",
     "@types/node": "^20.10.0",
     "@types/vscode": "^1.80.0",
+    "@vitest/coverage-v8": "^3.2.4",
     "@vscode/vsce": "^2.22.0",
     "esbuild": "^0.20.2",
     "typescript": "^5.4.0",

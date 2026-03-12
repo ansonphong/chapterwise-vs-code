@@ -1,5 +1,12 @@
 import { vi } from 'vitest';
 
+export enum FileType {
+  Unknown = 0,
+  File = 1,
+  Directory = 2,
+  SymbolicLink = 64,
+}
+
 export const window = {
   showQuickPick: vi.fn(),
   showInputBox: vi.fn(),
@@ -71,13 +78,6 @@ export class EventEmitter<T = void> {
   dispose() {
     this.listeners = [];
   }
-}
-
-export enum FileType {
-  Unknown = 0,
-  File = 1,
-  Directory = 2,
-  SymbolicLink = 64,
 }
 
 export const env = {

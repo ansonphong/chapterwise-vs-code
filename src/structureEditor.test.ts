@@ -3,25 +3,6 @@ import { CodexStructureEditor } from './structureEditor';
 import * as YAML from 'yaml';
 import { workspace } from 'vscode';
 
-// Mock vscode module
-vi.mock('vscode', () => ({
-  workspace: {
-    applyEdit: vi.fn().mockResolvedValue(true),
-  },
-  WorkspaceEdit: class {
-    private _edits: any[] = [];
-    replace(uri: any, range: any, newText: string) {
-      this._edits.push({ uri, range, newText });
-    }
-  },
-  Range: class {
-    constructor(public sl: number, public sc: number, public el: number, public ec: number) {}
-  },
-  Uri: { file: (p: string) => ({ fsPath: p, scheme: 'file', path: p }) },
-  window: { showErrorMessage: vi.fn(), showWarningMessage: vi.fn() },
-  FileType: { File: 1, Directory: 2 },
-}));
-
 function makeDoc(yamlContent: string) {
   return {
     getText: () => yamlContent,
