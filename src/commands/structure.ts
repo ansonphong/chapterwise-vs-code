@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import YAML from 'yaml';
 import type { CommandDeps } from './types';
 import { CodexTreeItem, IndexNodeTreeItem } from '../treeProvider';
 
@@ -705,7 +706,8 @@ export function registerStructureCommands(
       const wsRoot = getWorkspaceRoot();
       if (!wsRoot) return;
       const { generateIndex } = await import('../indexGenerator');
-      const indexData = await generateIndex(wsRoot);
+      const indexYaml = await generateIndex({ workspaceRoot: wsRoot });
+      const indexData = indexYaml ? YAML.parse(indexYaml) : null;
       const nodeItems: Array<{ label: string; description: string; id: string }> = [];
       const collectNodes = (nodes: any[]) => {
         for (const n of nodes) {

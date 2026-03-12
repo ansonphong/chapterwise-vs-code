@@ -15,7 +15,7 @@
     "declarationMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "out"]
+  "exclude": ["node_modules", "out", "src/**/*.test.ts", "src/__mocks__/**", "src/test/**"]
 }
 
 

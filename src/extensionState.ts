@@ -271,14 +271,14 @@ export async function restoreLastContext(context: vscode.ExtensionContext): Prom
     if (savedContextType === 'folder') {
       outputChannel.appendLine(`[restoreLastContext] Restoring folder context: ${savedContextPath}`);
       await withTimeout(
-        vscode.commands.executeCommand('chapterwiseCodex.setContextFolder', uri),
+        Promise.resolve(vscode.commands.executeCommand('chapterwiseCodex.setContextFolder', uri)),
         RESTORE_TIMEOUT_MS,
         'Timeout restoring folder context'
       );
     } else if (savedContextType === 'file') {
       outputChannel.appendLine(`[restoreLastContext] Restoring file context: ${savedContextPath}`);
       await withTimeout(
-        vscode.commands.executeCommand('chapterwiseCodex.setContextFile', uri),
+        Promise.resolve(vscode.commands.executeCommand('chapterwiseCodex.setContextFile', uri)),
         RESTORE_TIMEOUT_MS,
         'Timeout restoring file context'
       );

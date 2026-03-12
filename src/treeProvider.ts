@@ -27,35 +27,35 @@ function isPathWithinRoot(resolvedPath: string, rootPath: string): boolean {
  * unsafe `as any` casts throughout the tree provider.
  */
 function getNodeKind(node: IndexChildNode): string | undefined {
-  return (node as Record<string, unknown>)._node_kind as string | undefined;
+  return (node as unknown as Record<string, unknown>)._node_kind as string | undefined;
 }
 
 function getNodeParentFile(node: IndexChildNode): string | undefined {
-  return (node as Record<string, unknown>)._parent_file as string | undefined;
+  return (node as unknown as Record<string, unknown>)._parent_file as string | undefined;
 }
 
 function getNodeFieldName(node: IndexChildNode): string | undefined {
-  return (node as Record<string, unknown>)._field_name as string | undefined;
+  return (node as unknown as Record<string, unknown>)._field_name as string | undefined;
 }
 
 function getNodeFieldType(node: IndexChildNode): string | undefined {
-  return (node as Record<string, unknown>)._field_type as string | undefined;
+  return (node as unknown as Record<string, unknown>)._field_type as string | undefined;
 }
 
 function getNodeParentEntity(node: IndexChildNode): string | undefined {
-  return (node as Record<string, unknown>)._parent_entity as string | undefined;
+  return (node as unknown as Record<string, unknown>)._parent_entity as string | undefined;
 }
 
 function getNodeDepth(node: IndexChildNode): number | undefined {
-  return (node as Record<string, unknown>)._depth as number | undefined;
+  return (node as unknown as Record<string, unknown>)._depth as number | undefined;
 }
 
 function getNodeErrorMessage(node: IndexChildNode): string | undefined {
-  return (node as Record<string, unknown>)._error_message as string | undefined;
+  return (node as unknown as Record<string, unknown>)._error_message as string | undefined;
 }
 
 function getNodeOriginalInclude(node: IndexChildNode): string | undefined {
-  return (node as Record<string, unknown>)._original_include as string | undefined;
+  return (node as unknown as Record<string, unknown>)._original_include as string | undefined;
 }
 
 /**
