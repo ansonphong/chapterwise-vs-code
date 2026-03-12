@@ -611,8 +611,6 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
   private isLoading: boolean = false;              // Loading state for index generation
   private loadingMessage: string | null = null;    // Loading message to display
   private contextExplicitlySet: boolean = false;   // Track if user has explicitly set context
-  private contextFolder: string | null = null;     // Context folder path (kept for backward compatibility)
-  private workspaceRoot: string | null = null;     // Workspace root (kept for backward compatibility)
 
   /**
    * CENTRALIZED CONTEXT STATE
@@ -867,8 +865,8 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
     this._logContextChange('setContextFolder', {
       'New folder': folderPath,
       'Workspace root': workspaceRoot,
-      'Previous folder': this.contextFolder || 'none',
-      'Previous workspace root': this.workspaceRoot || 'none'
+      'Previous folder': this.currentContext.contextFolder || 'none',
+      'Previous workspace root': this.currentContext.workspaceRoot || 'none'
     });
 
     // MARK CONTEXT AS EXPLICITLY SET BY USER
@@ -877,9 +875,6 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
     // UPDATE CENTRALIZED CONTEXT
     this.currentContext.workspaceRoot = workspaceRoot;
     this.currentContext.contextFolder = folderPath;
-
-    this.contextFolder = folderPath;
-    this.workspaceRoot = workspaceRoot;
 
     if (folderPath) {
       const indexPath = path.join(workspaceRoot, folderPath, '.index.codex.json');
@@ -932,8 +927,6 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
       }
     } else {
       // Reset to workspace root or FILES mode
-      this.contextFolder = null;
-      this.workspaceRoot = null;
       this.currentContext.contextFolder = null;
       this.currentContext.workspaceRoot = null;
       this.isLoading = false;
@@ -954,7 +947,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
    * Get the current context folder path (relative to workspace root)
    */
   getContextFolder(): string | null {
-    return this.contextFolder;
+    return this.currentContext.contextFolder;
   }
 
   /**
@@ -1246,14 +1239,14 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
     }
 
     // Use workspaceRoot that was set in setContextFolder (no need for activeDocument)
-    if (!this.workspaceRoot || !this.contextFolder) {
+    if (!this.currentContext.workspaceRoot || !this.currentContext.contextFolder) {
       log('[TreeProvider] getIndexChildren: Missing workspaceRoot or contextFolder');
       return [];
     }
-    const workspaceRoot = this.workspaceRoot;
+    const workspaceRoot = this.currentContext.workspaceRoot;
 
     // Construct URI for index file
-    const indexPath = path.join(workspaceRoot, this.contextFolder, '.index.codex.json');
+    const indexPath = path.join(workspaceRoot, this.currentContext.contextFolder, '.index.codex.json');
     const uri = vscode.Uri.file(indexPath);
 
     if (!element) {
@@ -1340,20 +1333,24 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
       !!hasChildren,
       (computedPath: string) => this.resolveFilePath(computedPath)
     );
-    // Add cut indicator if node is in clipboard
-    if (node.id && this.isNodeCut(node.id)) {
-      treeItem.description = `${treeItem.description || ''} (cut)`.trim();
-    }
+    this.applyCutDescription(treeItem, node.id);
     return treeItem;
+  }
+
+  /**
+   * Apply cut indicator description to any tree item if the node is in the clipboard
+   */
+  private applyCutDescription(item: vscode.TreeItem, nodeId: string | undefined): void {
+    if (nodeId && this.isNodeCut(nodeId)) {
+      item.description = `${item.description || ''} (cut)`.trim();
+    }
   }
 
   /**
    * Apply cut indicator to a CodexTreeItem if the node is in the clipboard
    */
   private applyCutIndicator(item: CodexTreeItem): CodexTreeItem {
-    if (item.codexNode.id && this.isNodeCut(item.codexNode.id)) {
-      item.description = `${item.description || ''} (cut)`.trim();
-    }
+    this.applyCutDescription(item, item.codexNode.id);
     return item;
   }
 
