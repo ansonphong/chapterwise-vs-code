@@ -746,7 +746,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
    * @param explicit If true, this is an explicit user action (right-click command). If false, block unless context was already explicitly set.
    */
   setActiveDocument(document: vscode.TextDocument, explicit: boolean = false): void {
-    if (!isCodexLikeFile(document.fileName)) {
+    if (!isCodexLikeFile(document.fileName) && !isIndexFile(document.fileName)) {
       return;
     }
 

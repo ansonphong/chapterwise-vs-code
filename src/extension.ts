@@ -1886,6 +1886,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
           return;
         }
 
+        const nodeKind = (treeItem.indexNode as any)._node_kind;
+        if (nodeKind === 'node') {
+          vscode.window.showInformationMessage('Inline node reorder is not yet supported. Use drag-and-drop instead.');
+          return;
+        }
+
         const wsRoot = getWorkspaceRoot();
         if (!wsRoot) return;
 
@@ -1916,6 +1922,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
         if (!(treeItem instanceof IndexNodeTreeItem)) {
           vscode.window.showInformationMessage('Move up/down only works in Index mode');
+          return;
+        }
+
+        const nodeKind = (treeItem.indexNode as any)._node_kind;
+        if (nodeKind === 'node') {
+          vscode.window.showInformationMessage('Inline node reorder is not yet supported. Use drag-and-drop instead.');
           return;
         }
 
@@ -1968,8 +1980,24 @@ function registerCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('chapterwiseCodex.addField', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
-      const fieldName = await vscode.window.showInputBox({ prompt: 'Enter field name', placeHolder: 'e.g., synopsis, notes' });
-      if (!fieldName) return;
+      const { PROSE_FIELDS } = await import('./codexModel');
+      const COMMON_FIELDS = [...PROSE_FIELDS, 'notes', 'synopsis'];
+      let existingFields: string[] = [];
+      if (treeItem instanceof CodexTreeItem) {
+        existingFields = treeItem.codexNode.availableFields || [];
+      }
+      const items = COMMON_FIELDS
+        .filter(f => !existingFields.includes(f))
+        .map(f => ({ label: f.charAt(0).toUpperCase() + f.slice(1), field: f }));
+      items.push({ label: 'Custom...', field: '__custom__' });
+      const picked = await vscode.window.showQuickPick(items, { placeHolder: 'Select a field to add' });
+      if (!picked) return;
+      let fieldName = picked.field;
+      if (fieldName === '__custom__') {
+        const custom = await vscode.window.showInputBox({ prompt: 'Enter custom field name' });
+        if (!custom) return;
+        fieldName = custom;
+      }
       const { getStructureEditor } = await import('./structureEditor');
       const editor = getStructureEditor();
       if (treeItem instanceof CodexTreeItem) {
@@ -2104,8 +2132,24 @@ function registerCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('chapterwiseCodex.addRelation', async (treeItem?: CodexTreeItem | IndexNodeTreeItem) => {
       if (!treeItem) return;
-      const targetId = await vscode.window.showInputBox({ prompt: 'Enter target node ID' });
-      if (!targetId) return;
+      // Step 1: Pick target node from project
+      const wsRoot = getWorkspaceRoot();
+      if (!wsRoot) return;
+      const { generateIndex } = await import('./indexGenerator');
+      const indexData = await generateIndex(wsRoot);
+      const nodeItems: Array<{ label: string; description: string; id: string }> = [];
+      const collectNodes = (nodes: any[]) => {
+        for (const n of nodes) {
+          if (n.id && n.type !== 'folder') {
+            nodeItems.push({ label: n.name || n.id, description: n.type || '', id: n.id });
+          }
+          if (n.children) collectNodes(n.children);
+        }
+      };
+      if (indexData?.children) collectNodes(indexData.children);
+      const targetPick = await vscode.window.showQuickPick(nodeItems, { placeHolder: 'Select target node for relation' });
+      if (!targetPick) return;
+      // Step 2: Pick relation type
       const relTypes = ['follows', 'precedes', 'references', 'parent-of', 'child-of', 'related-to'];
       const relType = await vscode.window.showQuickPick(relTypes, { placeHolder: 'Select relation type' });
       if (!relType) return;
@@ -2113,12 +2157,10 @@ function registerCommands(context: vscode.ExtensionContext): void {
       const editor = getStructureEditor();
       if (treeItem instanceof CodexTreeItem) {
         const doc = await vscode.workspace.openTextDocument(treeItem.documentUri);
-        await editor.addRelationToNode(doc, treeItem.codexNode, targetId, relType);
+        await editor.addRelationToNode(doc, treeItem.codexNode, targetPick.id, relType);
       } else if (treeItem instanceof IndexNodeTreeItem) {
-        const wsRoot = getWorkspaceRoot();
-        if (!wsRoot) return;
         const resolved = await resolveIndexNodeForEdit(treeItem, wsRoot);
-        if (resolved) await editor.addRelationToNode(resolved.doc, resolved.node, targetId, relType);
+        if (resolved) await editor.addRelationToNode(resolved.doc, resolved.node, targetPick.id, relType);
       }
       await reloadTreeIndex();
     })
@@ -2237,11 +2279,12 @@ function registerCommands(context: vscode.ExtensionContext): void {
   const getClipboard = async () => {
     if (!clipboardManager) {
       const { ClipboardManager } = await import('./clipboardManager');
-      clipboardManager = new ClipboardManager();
-      context.subscriptions.push(clipboardManager);
+      const cm = new ClipboardManager();
+      clipboardManager = cm;
+      context.subscriptions.push(cm);
       treeProvider.setIsCutFn(
-        (nodeId: string) => clipboardManager.isCut(nodeId),
-        clipboardManager.onDidChange
+        (nodeId: string) => cm.isCut(nodeId),
+        cm.onDidChange
       );
     }
     return clipboardManager;
@@ -2466,6 +2509,10 @@ function registerCommands(context: vscode.ExtensionContext): void {
       }
       const fsPromises = await import('fs/promises');
       await fsPromises.rename(oldFullPath, newFullPath);
+      // Update include paths in all files that referenced the old folder path
+      const { getStructureEditor } = await import('./structureEditor');
+      const editor = getStructureEditor();
+      await editor.updateIncludePaths(wsRoot, oldPath, newPath);
       await regenerateAndReload(wsRoot);
     })
   );
@@ -2609,7 +2656,13 @@ function registerCommands(context: vscode.ExtensionContext): void {
         const indexPath = path.join(workspaceRoot.uri.fsPath, '.index.codex.json');
         if (fs.existsSync(indexPath)) {
           const doc = await vscode.workspace.openTextDocument(indexPath);
-          treeProvider.setActiveDocument(doc);
+          treeProvider.setActiveDocument(doc, true);
+
+          // Reinitialize search for workspace root (setActiveDocument doesn't do this)
+          const searchManager = getSearchIndexManager();
+          if (searchManager) {
+            searchManager.initializeForContext('.', workspaceRoot.uri.fsPath);
+          }
         }
       }
     })
