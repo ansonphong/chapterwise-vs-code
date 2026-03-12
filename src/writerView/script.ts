@@ -1055,10 +1055,15 @@ export function getWriterViewScript(node: CodexNode, initialField: string): stri
     editor.addEventListener('beforeinput', handleEditorChange);
 
     // Overview prose editor handlers
+    let summaryAutoSaveTimer = null;
+    let bodyAutoSaveTimer = null;
+
     function handleSummaryChange() {
       if (summaryEditorContent && summaryEditorContent.innerText !== originalSummary) {
         summaryDirty = true;
         updateDirtyIndicator();
+        if (summaryAutoSaveTimer) clearTimeout(summaryAutoSaveTimer);
+        summaryAutoSaveTimer = setTimeout(() => { save(); }, 2000);
       }
     }
 
@@ -1066,11 +1071,16 @@ export function getWriterViewScript(node: CodexNode, initialField: string): stri
       if (bodyEditorContent && bodyEditorContent.innerText !== originalBody) {
         bodyDirty = true;
         updateDirtyIndicator();
+        if (bodyAutoSaveTimer) clearTimeout(bodyAutoSaveTimer);
+        bodyAutoSaveTimer = setTimeout(() => { save(); }, 2000);
       }
     }
 
     if (summaryEditorContent) {
       summaryEditorContent.addEventListener('input', handleSummaryChange);
+      summaryEditorContent.addEventListener('blur', () => {
+        if (summaryDirty) save();
+      });
       summaryEditorContent.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
           e.preventDefault();
@@ -1081,6 +1091,9 @@ export function getWriterViewScript(node: CodexNode, initialField: string): stri
 
     if (bodyEditorContent) {
       bodyEditorContent.addEventListener('input', handleBodyChange);
+      bodyEditorContent.addEventListener('blur', () => {
+        if (bodyDirty) save();
+      });
       bodyEditorContent.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
           e.preventDefault();
@@ -1157,12 +1170,20 @@ export function getWriterViewScript(node: CodexNode, initialField: string): stri
     window.addEventListener('message', (event) => {
       const message = event.data;
       switch (message.type) {
-        case 'saved':
-          isDirty = false;
+        case 'saved': {
+          const savedField = message.field;
+          if (savedField === 'summary') {
+            summaryDirty = false;
+          } else if (savedField === 'body') {
+            bodyDirty = false;
+          } else {
+            isDirty = false;
+          }
           isSaving = false;
           if (saveGuardTimer) { clearTimeout(saveGuardTimer); saveGuardTimer = null; }
           checkAllClean();
           break;
+        }
         case 'nameUpdated':
           if (nodeNameDisplay && nodeNameEdit) {
             nodeNameDisplay.textContent = message.name;
@@ -1844,7 +1865,7 @@ export function getWriterViewScript(node: CodexNode, initialField: string): stri
 
     // Check if all saves are complete
     function checkAllClean() {
-      if (!isDirty && !attributesDirty && !contentSectionsDirty && !imagesDirty) {
+      if (!isDirty && !attributesDirty && !contentSectionsDirty && !summaryDirty && !bodyDirty && !imagesDirty) {
         saveMenuBtn.disabled = false;
         saveMenuBtn.classList.remove('dirty');
         saveMenuBtn.classList.add('saved-flash');

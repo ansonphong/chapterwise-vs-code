@@ -71,7 +71,7 @@ export function registerSearchCommands(
           if (isStructural) {
             await vscode.commands.executeCommand(
               'chapterwiseCodex.navigateToNode',
-              result.id
+              { nodeId: result.id, parentFile: result.path }
             );
           } else if (workspaceRoot) {
             const fullPath = path.join(workspaceRoot, result.path);

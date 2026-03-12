@@ -42,7 +42,7 @@ export function isPathWithinWorkspace(targetPath: string, workspaceRoot: string)
   if (!workspaceRoot) {
     return false;
   }
-  const resolved = path.resolve(workspaceRoot, targetPath.replace(/^\//, ''));
+  const resolved = path.resolve(workspaceRoot, targetPath);
   const relative = path.relative(workspaceRoot, resolved);
   return !relative.startsWith('..') && !path.isAbsolute(relative);
 }

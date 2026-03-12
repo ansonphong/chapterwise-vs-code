@@ -207,7 +207,7 @@ tags:
 
 This extension works with both:
 
-- **Visual Studio Code** — Version 1.85.0 or later
+- **Visual Studio Code** — Version 1.80.0 or later
 - **Cursor** — All versions (Cursor is built on VS Code, so all features work seamlessly)
 
 ## Development
@@ -239,10 +239,10 @@ npm run compile
 npm run package
 
 # Install in VS Code
-code --install-extension chapterwise-codex-0.1.0.vsix --force
+code --install-extension chapterwise-codex-0.3.2.vsix --force
 
 # Install in Cursor
-cursor --install-extension chapterwise-codex-0.1.0.vsix --force
+cursor --install-extension chapterwise-codex-0.3.2.vsix --force
 ```
 
 ## Documentation

@@ -326,12 +326,6 @@ export function getToolbarScript(node: CodexNode, initialField: string): string 
         }
       });
       
-      // Close dropdown when clicking outside
-      document.addEventListener('click', (e) => {
-        if (!addDropdown.contains(e.target)) {
-          closeAddDropdown();
-        }
-      });
     }
     
     /**
@@ -403,18 +397,23 @@ export function getToolbarScript(node: CodexNode, initialField: string): string 
      * Initialize toolbar
      */
     function initToolbar() {
-      initFormattingButtons();
-      initAddDropdown();
-      
-      // Update toolbar context on initial load
+      // updateToolbarContext handles calling initFormattingButtons or initAddDropdown
       updateToolbarContext(currentToolbarContext);
     }
-    
+
+    // Single document-level click handler — registered once, queries DOM at call time
+    document.addEventListener('click', (e) => {
+      const addDropdown = document.getElementById('toolbarAddDropdown');
+      if (addDropdown && !addDropdown.contains(e.target)) {
+        closeAddDropdown();
+      }
+    });
+
     // Initialize toolbar when DOM is ready
     if (toolbar) {
       initToolbar();
     }
-    
+
     // Export function to be called by main script when field changes
     window.updateToolbarForField = onFieldSelectorChange;
   `;

@@ -169,7 +169,7 @@ export function registerNavigationCommands(
           return;
         }
 
-        let targetNode: CodexNode | null = null;
+        let targetNode: CodexNode | null;
 
         if (parentEntity) {
           targetNode = codexDoc.allNodes.find(n => n.id === parentEntity) || null;
@@ -207,13 +207,22 @@ export function registerNavigationCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'chapterwiseCodex.navigateToNode',
-      async (treeItem?: IndexNodeTreeItem) => {
-        if (!treeItem || !treeItem.indexNode) {
-          return;
+      async (arg?: IndexNodeTreeItem | { nodeId: string; parentFile: string }) => {
+        let targetNodeId: string | undefined;
+        let parentFile: string | undefined;
+
+        if (arg && 'indexNode' in arg) {
+          const indexNode = (arg as IndexNodeTreeItem).indexNode as any;
+          targetNodeId = indexNode.id;
+          parentFile = indexNode._parent_file;
+        } else if (arg && 'nodeId' in arg) {
+          targetNodeId = arg.nodeId;
+          parentFile = arg.parentFile;
         }
 
-        const node = treeItem.indexNode as any;
-        const parentFile = node._parent_file;
+        if (!parentFile) {
+          return;
+        }
 
         if (!parentFile) {
           vscode.window.showWarningMessage('Cannot navigate: No parent file found');
@@ -228,13 +237,16 @@ export function registerNavigationCommands(
 
         const fullPath = path.join(workspaceRoot, parentFile);
 
-        if (!fs.existsSync(fullPath)) {
+        const uri = vscode.Uri.file(fullPath);
+        try {
+          await vscode.workspace.fs.stat(uri);
+        } catch {
           vscode.window.showWarningMessage(`File not found: ${parentFile}`);
           return;
         }
 
-        const uri = vscode.Uri.file(fullPath);
-        const fileContent = fs.readFileSync(fullPath, 'utf-8');
+        const fileContentBytes = await vscode.workspace.fs.readFile(uri);
+        const fileContent = Buffer.from(fileContentBytes).toString('utf-8');
 
         const codexDoc = isMarkdownFile(fullPath)
           ? parseMarkdownAsCodex(fileContent, fullPath)
@@ -246,7 +258,6 @@ export function registerNavigationCommands(
           return;
         }
 
-        const targetNodeId = node.id;
         let targetNode: CodexNode | null = null;
 
         if (targetNodeId) {

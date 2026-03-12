@@ -24,7 +24,8 @@ import {
   getNodeProse,
   setNodeAttributes,
   setNodeContentSections,
-  isMarkdownFile
+  isMarkdownFile,
+  isJsonContent
 } from '../codexModel';
 import { CodexTreeItem, CodexTreeProvider } from '../treeProvider';
 import { WriterPanelStats, calculateStats } from './utils/stats';
@@ -244,17 +245,61 @@ export class WriterViewManager {
     const panelKey = `${documentUri.toString()}#${node.id || node.path.join('/')}`;
 
     // Check if panel already exists - just focus it
-    let existingPanel = this.panels.get(panelKey);
+    const existingPanel = this.panels.get(panelKey);
     if (existingPanel) {
       existingPanel.reveal(vscode.ViewColumn.Active);
       return;
     }
 
-    // Read file directly - DON'T open in VS Code text editor
+    // Determine initial field based on node structure using smart defaults
+    const proseFieldCount = node.availableFields.filter(f => !f.startsWith('__')).length;
+    const hasChildren = node.children && node.children.length > 0;
+    const fieldCount = proseFieldCount + (node.hasContentSections ? 1 : 0) + (node.hasAttributes ? 1 : 0) + (hasChildren ? 1 : 0);
+
+    let initialField: string;
+    if (fieldCount > 1) {
+      initialField = '__overview__';
+    } else if (node.availableFields.includes('summary')) {
+      initialField = 'summary';
+    } else if (node.availableFields.includes('body')) {
+      initialField = 'body';
+    } else if (node.availableFields.length > 0) {
+      initialField = node.availableFields[0];
+    } else {
+      initialField = '__overview__';
+    }
+
+    await this.bootstrapPanel(node, documentUri, initialField, panelKey);
+  }
+
+  /**
+   * Open Writer View for a specific field of a node
+   */
+  async openWriterViewForField(node: CodexNode, documentUri: vscode.Uri, targetField: string): Promise<void> {
+    const panelKey = `${documentUri.toString()}#${node.id || node.path.join('/')}`;
+
+    const existingPanel = this.panels.get(panelKey);
+    if (existingPanel) {
+      existingPanel.reveal(vscode.ViewColumn.Active);
+      safePostMessage(existingPanel, { type: 'switchToField', field: targetField });
+      return;
+    }
+
+    await this.bootstrapPanel(node, documentUri, targetField, panelKey);
+  }
+
+  /**
+   * Shared panel bootstrap — creates panel, sets HTML, wires message handlers and disposal
+   */
+  private async bootstrapPanel(
+    node: CodexNode,
+    documentUri: vscode.Uri,
+    initialField: string,
+    panelKey: string
+  ): Promise<void> {
     const fileName = documentUri.fsPath;
     const text = await fsPromises.readFile(fileName, 'utf-8');
 
-    // Use appropriate parser based on file type
     const codexDoc = isMarkdownFile(fileName)
       ? parseMarkdownAsCodex(text, fileName)
       : parseCodex(text);
@@ -265,54 +310,22 @@ export class WriterViewManager {
       return;
     }
 
-    // Determine initial field based on node structure using smart defaults
-    let initialField: string;
-
-    // Smart default: overview for multi-field nodes, single field otherwise
-    const proseFieldCount = node.availableFields.filter(f => !f.startsWith('__')).length;
-    const hasChildren = node.children && node.children.length > 0;
-    const hasContentSections = node.hasContentSections;
-    const hasAttributes = node.hasAttributes;
-
-    // Count total fields
-    const fieldCount = proseFieldCount + (hasContentSections ? 1 : 0) + (hasAttributes ? 1 : 0) + (hasChildren ? 1 : 0);
-
-    // Default to overview if multiple fields, otherwise show the single field
-    if (fieldCount > 1) {
-      initialField = '__overview__';
-    } else if (node.availableFields.includes('summary')) {
-      initialField = 'summary';
-    } else if (node.availableFields.includes('body')) {
-      initialField = 'body';
-    } else if (node.availableFields.length > 0) {
-      initialField = node.availableFields[0];
-    } else {
-      // Single structured field - stay in overview to show it
-      initialField = '__overview__';
-    }
-
     // Remap special fields to actual prose field for initial content load
     let proseFieldToLoad = initialField;
     if (initialField === '__overview__' || initialField === '__content__' || initialField === '__attributes__') {
-      // For overview and structured fields, load the primary prose field (summary or body)
-      // This ensures the prose editor has content even if we're showing structured view
       proseFieldToLoad = node.availableFields.includes('summary') ? 'summary' : (node.proseField || 'body');
     }
 
     let prose: string;
-    // Handle special fields (attributes, content sections) - they don't have prose content
     if (proseFieldToLoad.startsWith('__')) {
       prose = '';
     } else if (isMarkdownFile(fileName)) {
-      // For markdown files, extract field from frontmatter or body
       if (proseFieldToLoad === 'body') {
         prose = codexDoc.rootNode?.proseValue ?? '';
       } else if (proseFieldToLoad === 'summary') {
-        // For summary field, get from frontmatter
         const frontmatter = codexDoc.frontmatter as Record<string, unknown> | undefined;
         prose = (frontmatter?.summary as string) ?? '';
       } else {
-        // For any other fields, try frontmatter
         const frontmatter = codexDoc.frontmatter as Record<string, unknown> | undefined;
         prose = (frontmatter?.[proseFieldToLoad] as string) ?? '';
       }
@@ -335,14 +348,12 @@ export class WriterViewManager {
       }
     }
 
-    // Get workspace root for relative path display
     const workspaceRoot = this.getWorkspaceRoot();
 
-    // Create new panel in the ACTIVE editor group (same frame, new tab)
-    let panel = vscode.window.createWebviewPanel(
+    const panel = vscode.window.createWebviewPanel(
       'chapterwiseCodexWriter',
       `🖋️ ${node.name || 'Writer'}`,
-      vscode.ViewColumn.Active,  // Opens in current editor group as new tab
+      vscode.ViewColumn.Active,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
@@ -355,22 +366,15 @@ export class WriterViewManager {
 
     this.panels.set(panelKey, panel);
 
-    // Get author display
     const authorDisplay = this.getAuthorDisplay(codexDoc);
 
-    // Resolve image URLs for webview
     const resolvedImages = node.images?.map(img => ({
       ...img,
       url: this.resolveImageUrlForWebview(panel.webview, img.url, workspaceRoot)
     }));
 
-    // Create a modified node with resolved image URLs
-    const nodeWithResolvedImages = {
-      ...node,
-      images: resolvedImages
-    };
+    const nodeWithResolvedImages = { ...node, images: resolvedImages };
 
-    // Set initial HTML with remembered field using the new builder
     panel.webview.html = buildWebviewHtml({
       webview: panel.webview,
       node: nodeWithResolvedImages,
@@ -384,26 +388,21 @@ export class WriterViewManager {
       proseFields,
     });
 
-    // Store initial stats and update status bar
     const initialStats = calculateStats(prose, node.name, initialField);
     this.updateStatsForPanel(panelKey, panel, initialStats);
 
-    // Track current field for this panel
     let currentField = initialField;
     let currentType = node.type;
     let currentAttributes: CodexAttribute[] = node.attributes || [];
     let currentContentSections: CodexContentSection[] = node.contentSections || [];
 
-    // Listen for panel visibility/focus changes
     const viewStateDisposable = panel.onDidChangeViewState(() => {
-      // Update status bar whenever any panel's state changes
       this.updateStatusBarForActivePanel();
     });
 
-    // Handle messages from webview (closure captures node and documentUri)
+    // Handle messages from webview
     panel.webview.onDidReceiveMessage(
       async (message) => {
-        // Validate message structure
         if (!message || typeof message.type !== 'string') {
           return;
         }
@@ -415,11 +414,10 @@ export class WriterViewManager {
             const typeToSave = (typeof message.newType === 'string') ? message.newType : currentType;
             await this.handleSave(documentUri, node, message.text, fieldToSave, typeToSave);
 
-            // Update stored stats
             const saveStats = calculateStats(message.text, node.name, fieldToSave);
             this.updateStatsForPanel(panelKey, panel, saveStats);
 
-            safePostMessage(panel, { type: 'saved' });
+            safePostMessage(panel, { type: 'saved', field: fieldToSave });
             break;
           }
 
@@ -428,7 +426,6 @@ export class WriterViewManager {
             break;
 
           case 'openFile': {
-            // Open the file in normal code editor
             const doc = await vscode.workspace.openTextDocument(documentUri);
             await vscode.window.showTextDocument(doc, { preview: false });
             break;
@@ -436,13 +433,11 @@ export class WriterViewManager {
 
           case 'typeChanged':
             if (typeof message.newType !== 'string') { return; }
-            // Store the new type value (will be saved with next save)
             currentType = message.newType;
             break;
 
           case 'contentChanged': {
             if (typeof message.text !== 'string') { return; }
-            // New message type for real-time updates
             const contentStats = calculateStats(message.text, node.name, currentField);
             this.updateStatsForPanel(panelKey, panel, contentStats);
             break;
@@ -462,9 +457,7 @@ export class WriterViewManager {
             if (typeof message.field !== 'string') { return; }
             currentField = message.field;
 
-            // Only fetch prose content for regular fields (not attributes/content)
             if (message.field !== '__attributes__' && message.field !== '__content__') {
-              // Read file directly - DON'T open in VS Code text editor
               const filePath = documentUri.fsPath;
               const text = await fsPromises.readFile(filePath, 'utf-8');
 
@@ -476,16 +469,13 @@ export class WriterViewManager {
                 let fieldContent: string;
 
                 if (isMarkdownFile(fileName)) {
-                  // For markdown files, extract field from frontmatter or body
                   if (message.field === 'body') {
                     fieldContent = parsed.rootNode?.proseValue ?? '';
                   } else {
-                    // For summary and other fields, get from frontmatter
                     const frontmatter = parsed.frontmatter as Record<string, unknown> | undefined;
                     fieldContent = (frontmatter?.[message.field] as string) ?? '';
                   }
                 } else {
-                  // For codex files, use getNodeProse
                   fieldContent = getNodeProse(parsed, node, message.field);
                 }
 
@@ -496,7 +486,6 @@ export class WriterViewManager {
           }
 
           case 'requestContent': {
-            // Read file directly - DON'T open in VS Code text editor
             const filePathReq = documentUri.fsPath;
             const textReq = await fsPromises.readFile(filePathReq, 'utf-8');
             const parsedReq = isMarkdownFile(fileName)
@@ -505,16 +494,13 @@ export class WriterViewManager {
             if (parsedReq) {
               let currentProse: string;
               if (isMarkdownFile(fileName)) {
-                // For markdown files, extract field from frontmatter or body
                 if (currentField === 'body') {
                   currentProse = parsedReq.rootNode?.proseValue ?? '';
                 } else {
-                  // For summary and other fields, get from frontmatter
                   const frontmatter = parsedReq.frontmatter as Record<string, unknown> | undefined;
                   currentProse = (frontmatter?.[currentField] as string) ?? '';
                 }
               } else {
-                // For codex files, use getNodeProse
                 currentProse = getNodeProse(parsedReq, node, currentField);
               }
               safePostMessage(panel, { type: 'content', text: currentProse });
@@ -522,26 +508,21 @@ export class WriterViewManager {
             break;
           }
 
-          // Attributes - batch save (local state is managed in webview for instant UI)
           case 'saveAttributes':
             if (!Array.isArray(message.attributes)) { return; }
-            // Receive full array from webview and save once
             currentAttributes = message.attributes;
             await this.handleSaveAttributes(documentUri, node, currentAttributes);
             safePostMessage(panel, { type: 'saveComplete' });
             break;
 
-          // Content Sections - batch save (local state is managed in webview for instant UI)
           case 'saveContentSections':
             if (!Array.isArray(message.sections)) { return; }
-            // Receive full array from webview and save once
             currentContentSections = message.sections;
             await this.handleSaveContentSections(documentUri, node, currentContentSections);
             safePostMessage(panel, { type: 'saveComplete' });
             break;
 
           default:
-            // Delegate image-related messages to shared handler
             await this.handleImageMessage(message, panel, documentUri, node, workspaceRoot);
             break;
         }
@@ -550,374 +531,28 @@ export class WriterViewManager {
       this.context.subscriptions
     );
 
-    // Listen for VS Code theme changes (affects "theme" mode)
     const themeChangeDisposable = vscode.window.onDidChangeActiveColorTheme(() => {
       const vscodeThemeKind = this.getVSCodeThemeKind();
       const themeSetting = this.getThemeSetting();
-
-      // Update this specific panel
-      safePostMessage(panel, {
-        type: 'themeChanged',
-        themeSetting: themeSetting,
-        vscodeTheme: vscodeThemeKind
-      });
+      safePostMessage(panel, { type: 'themeChanged', themeSetting, vscodeTheme: vscodeThemeKind });
     });
 
-    // Listen for settings changes
     const configChangeDisposable = vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('chapterwiseCodex.writerView.theme')) {
         const themeSetting = this.getThemeSetting();
         const vscodeThemeKind = this.getVSCodeThemeKind();
-
-        // Update this specific panel
-        safePostMessage(panel, {
-          type: 'themeChanged',
-          themeSetting: themeSetting,
-          vscodeTheme: vscodeThemeKind
-        });
+        safePostMessage(panel, { type: 'themeChanged', themeSetting, vscodeTheme: vscodeThemeKind });
       }
     });
 
-    // Handle panel disposal
     panel.onDidDispose(() => {
       this.panels.delete(panelKey);
       this.panelStats.delete(panelKey);
-
-      // Update status bar (will show another Writer View if one exists, or hide)
       this.updateStatusBarForActivePanel();
-
       themeChangeDisposable.dispose();
       configChangeDisposable.dispose();
       viewStateDisposable.dispose();
 
-      // Clean up any pending duplicate resolver
-      const resolverKey = this.panelResolverKeys.get(panel);
-      if (resolverKey) {
-        const resolver = this.pendingDuplicateResolvers.get(resolverKey);
-        if (resolver) {
-          resolver.resolve({ type: 'cancel' });
-        }
-        this.pendingDuplicateResolvers.delete(resolverKey);
-        this.panelResolverKeys.delete(panel);
-      }
-    });
-  }
-
-  /**
-   * Open Writer View for a specific field of a node
-   */
-  async openWriterViewForField(node: CodexNode, documentUri: vscode.Uri, targetField: string): Promise<void> {
-    // Create a unique key for this panel (same as openWriterView)
-    const panelKey = `${documentUri.toString()}#${node.id || node.path.join('/')}`;
-
-    // Check if panel already exists
-    let existingPanel = this.panels.get(panelKey);
-    if (existingPanel) {
-      existingPanel.reveal(vscode.ViewColumn.Active);
-      // If panel exists, send message to switch to the target field
-      safePostMessage(existingPanel, {
-        type: 'switchToField',
-        field: targetField
-      });
-      return;
-    }
-
-    // Read file directly - DON'T open in VS Code text editor
-    const fileName = documentUri.fsPath;
-    const text = await fsPromises.readFile(fileName, 'utf-8');
-
-    // Use appropriate parser based on file type
-    const codexDoc = isMarkdownFile(fileName)
-      ? parseMarkdownAsCodex(text, fileName)
-      : parseCodex(text);
-
-    if (!codexDoc) {
-      const fileType = isMarkdownFile(fileName) ? 'Markdown' : 'Codex';
-      vscode.window.showErrorMessage(`Unable to parse ${fileType} document`);
-      return;
-    }
-
-    // Remap special fields to actual prose field for initial content load
-    let proseFieldToLoad = targetField;
-    if (targetField === '__overview__' || targetField === '__content__' || targetField === '__attributes__') {
-      // For overview and structured fields, load the primary prose field (summary or body)
-      // This ensures the prose editor has content even if we're showing structured view
-      proseFieldToLoad = node.availableFields.includes('summary') ? 'summary' : (node.proseField || 'body');
-    }
-
-    // Get prose value for the target field
-    let prose: string;
-    if (proseFieldToLoad.startsWith('__')) {
-      prose = '';
-    } else if (isMarkdownFile(fileName)) {
-      // For markdown files, extract field from frontmatter or body
-      if (proseFieldToLoad === 'body') {
-        prose = codexDoc.rootNode?.proseValue ?? '';
-      } else {
-        // For summary and other fields, get from frontmatter
-        const frontmatter = codexDoc.frontmatter as Record<string, unknown> | undefined;
-        prose = (frontmatter?.[proseFieldToLoad] as string) ?? '';
-      }
-    } else {
-      prose = getNodeProse(codexDoc, node, proseFieldToLoad);
-    }
-
-    // Load all prose fields for overview mode
-    const proseFields: Record<string, string> = {};
-    if (isMarkdownFile(fileName)) {
-      const frontmatter = codexDoc.frontmatter as Record<string, unknown> | undefined;
-      proseFields.summary = (frontmatter?.summary as string) ?? '';
-      proseFields.body = codexDoc.rootNode?.proseValue ?? '';
-    } else {
-      if (node.availableFields.includes('summary')) {
-        proseFields.summary = getNodeProse(codexDoc, node, 'summary');
-      }
-      if (node.availableFields.includes('body')) {
-        proseFields.body = getNodeProse(codexDoc, node, 'body');
-      }
-    }
-
-    // Get workspace root for relative path display
-    const workspaceRoot = this.getWorkspaceRoot();
-
-    // Create new panel
-    let panel = vscode.window.createWebviewPanel(
-      'chapterwiseCodexWriter',
-      `🖋️ ${node.name || 'Writer'}`,
-      vscode.ViewColumn.Active,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode.Uri.joinPath(this.context.extensionUri, 'media'),
-          ...(workspaceRoot ? [vscode.Uri.file(workspaceRoot)] : []),
-        ],
-      }
-    );
-
-    this.panels.set(panelKey, panel);
-
-    // Get author display
-    const authorDisplay = this.getAuthorDisplay(codexDoc);
-
-    // Resolve image URLs for webview
-    const resolvedImages = node.images?.map(img => ({
-      ...img,
-      url: this.resolveImageUrlForWebview(panel.webview, img.url, workspaceRoot)
-    }));
-
-    // Create a modified node with resolved image URLs
-    const nodeWithResolvedImages = {
-      ...node,
-      images: resolvedImages
-    };
-
-    // Set initial HTML with the target field selected using the new builder
-    panel.webview.html = buildWebviewHtml({
-      webview: panel.webview,
-      node: nodeWithResolvedImages,
-      prose,
-      initialField: targetField,
-      themeSetting: this.getThemeSetting(),
-      vscodeThemeKind: this.getVSCodeThemeKind(),
-      author: authorDisplay,
-      filePath: documentUri.fsPath,
-      workspaceRoot: workspaceRoot,
-      proseFields,
-    });
-
-    // Store initial stats and update status bar
-    const initialStats = calculateStats(prose, node.name, targetField);
-    this.updateStatsForPanel(panelKey, panel, initialStats);
-
-    // Track current field for this panel
-    let currentField = targetField;
-    let currentType = node.type;
-    let currentAttributes: CodexAttribute[] = node.attributes || [];
-    let currentContentSections: CodexContentSection[] = node.contentSections || [];
-
-    // Listen for panel visibility/focus changes
-    const viewStateDisposable2 = panel.onDidChangeViewState(() => {
-      // Update status bar whenever any panel's state changes
-      this.updateStatusBarForActivePanel();
-    });
-
-    // Handle messages from webview (same handlers as openWriterView)
-    panel.webview.onDidReceiveMessage(
-      async (message) => {
-        // Validate message structure
-        if (!message || typeof message.type !== 'string') {
-          return;
-        }
-
-        switch (message.type) {
-          case 'save': {
-            if (typeof message.text !== 'string') { return; }
-            const fieldToSave = (typeof message.field === 'string') ? message.field : currentField;
-            const typeToSave = (typeof message.newType === 'string') ? message.newType : currentType;
-            await this.handleSave(documentUri, node, message.text, fieldToSave, typeToSave);
-
-            // Update stored stats
-            const saveStats = calculateStats(message.text, node.name, fieldToSave);
-            this.updateStatsForPanel(panelKey, panel, saveStats);
-
-            safePostMessage(panel, { type: 'saved' });
-            break;
-          }
-
-          case 'saveAs':
-            await this.handleSaveAs(documentUri);
-            break;
-
-          case 'openFile': {
-            // Open the file in normal code editor
-            const doc = await vscode.workspace.openTextDocument(documentUri);
-            await vscode.window.showTextDocument(doc, { preview: false });
-            break;
-          }
-
-          case 'typeChanged':
-            if (typeof message.newType !== 'string') { return; }
-            // Store the new type value (will be saved with next save)
-            currentType = message.newType;
-            break;
-
-          case 'contentChanged': {
-            if (typeof message.text !== 'string') { return; }
-            // New message type for real-time updates
-            const contentStats = calculateStats(message.text, node.name, currentField);
-            this.updateStatsForPanel(panelKey, panel, contentStats);
-            break;
-          }
-
-          case 'switchField': {
-            if (typeof message.field !== 'string') { return; }
-            currentField = message.field;
-
-            if (message.field !== '__attributes__' && message.field !== '__content__') {
-              // Read file directly - DON'T open in VS Code text editor
-              const filePath = documentUri.fsPath;
-              const text = await fsPromises.readFile(filePath, 'utf-8');
-
-              const parsed = isMarkdownFile(fileName)
-                ? parseMarkdownAsCodex(text, fileName)
-                : parseCodex(text);
-
-              if (parsed) {
-                let fieldContent: string;
-
-                if (isMarkdownFile(fileName)) {
-                  // For markdown files, extract field from frontmatter or body
-                  if (message.field === 'body') {
-                    fieldContent = parsed.rootNode?.proseValue ?? '';
-                  } else {
-                    // For summary and other fields, get from frontmatter
-                    const frontmatter = parsed.frontmatter as Record<string, unknown> | undefined;
-                    fieldContent = (frontmatter?.[message.field] as string) ?? '';
-                  }
-                } else {
-                  // For codex files, use getNodeProse
-                  fieldContent = getNodeProse(parsed, node, message.field);
-                }
-
-                safePostMessage(panel, { type: 'fieldContent', text: fieldContent, field: message.field });
-              }
-            }
-            break;
-          }
-
-          case 'requestContent': {
-            // Read file directly - DON'T open in VS Code text editor
-            const filePathReq = documentUri.fsPath;
-            const textReq = await fsPromises.readFile(filePathReq, 'utf-8');
-            const parsedReq = isMarkdownFile(fileName)
-              ? parseMarkdownAsCodex(textReq, fileName)
-              : parseCodex(textReq);
-            if (parsedReq) {
-              let currentProse: string;
-              if (isMarkdownFile(fileName)) {
-                // For markdown files, extract field from frontmatter or body
-                if (currentField === 'body') {
-                  currentProse = parsedReq.rootNode?.proseValue ?? '';
-                } else {
-                  // For summary and other fields, get from frontmatter
-                  const frontmatter = parsedReq.frontmatter as Record<string, unknown> | undefined;
-                  currentProse = (frontmatter?.[currentField] as string) ?? '';
-                }
-              } else {
-                // For codex files, use getNodeProse
-                currentProse = getNodeProse(parsedReq, node, currentField);
-              }
-              safePostMessage(panel, { type: 'content', text: currentProse });
-            }
-            break;
-          }
-
-          case 'saveAttributes':
-            if (!Array.isArray(message.attributes)) { return; }
-            currentAttributes = message.attributes;
-            await this.handleSaveAttributes(documentUri, node, currentAttributes);
-            safePostMessage(panel, { type: 'saveComplete' });
-            break;
-
-          case 'saveContentSections':
-            if (!Array.isArray(message.sections)) { return; }
-            currentContentSections = message.sections;
-            await this.handleSaveContentSections(documentUri, node, currentContentSections);
-            safePostMessage(panel, { type: 'saveComplete' });
-            break;
-
-          default:
-            // Delegate image-related messages to shared handler
-            await this.handleImageMessage(message, panel, documentUri, node, workspaceRoot);
-            break;
-        }
-      },
-      undefined,
-      this.context.subscriptions
-    );
-
-    // Listen for VS Code theme changes (affects "theme" mode)
-    const themeChangeDisposable2 = vscode.window.onDidChangeActiveColorTheme(() => {
-      const vscodeThemeKind = this.getVSCodeThemeKind();
-      const themeSetting = this.getThemeSetting();
-
-      // Update this specific panel
-      safePostMessage(panel, {
-        type: 'themeChanged',
-        themeSetting: themeSetting,
-        vscodeTheme: vscodeThemeKind
-      });
-    });
-
-    // Listen for settings changes
-    const configChangeDisposable2 = vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('chapterwiseCodex.writerView.theme')) {
-        const themeSetting = this.getThemeSetting();
-        const vscodeThemeKind = this.getVSCodeThemeKind();
-
-        // Update this specific panel
-        safePostMessage(panel, {
-          type: 'themeChanged',
-          themeSetting: themeSetting,
-          vscodeTheme: vscodeThemeKind
-        });
-      }
-    });
-
-    // Handle panel disposal
-    panel.onDidDispose(() => {
-      this.panels.delete(panelKey);
-      this.panelStats.delete(panelKey);
-
-      // Update status bar (will show another Writer View if one exists, or hide)
-      this.updateStatusBarForActivePanel();
-
-      themeChangeDisposable2.dispose();
-      configChangeDisposable2.dispose();
-      viewStateDisposable2.dispose();
-
-      // Clean up any pending duplicate resolver
       const resolverKey = this.panelResolverKeys.get(panel);
       if (resolverKey) {
         const resolver = this.pendingDuplicateResolvers.get(resolverKey);
@@ -974,10 +609,15 @@ export class WriterViewManager {
 
       // Update type if changed
       if (newType && newType !== node.type) {
-        const codexDocWithType = parseCodex(newDocText);
-        if (codexDocWithType) {
-          newDocText = setNodeType(codexDocWithType, node, newType);
-          node.type = newType; // Update in-memory
+        if (isMarkdownFile(fileName)) {
+          newDocText = setMarkdownFrontmatterField(newDocText, 'type', newType);
+          node.type = newType;
+        } else {
+          const codexDocWithType = parseCodex(newDocText);
+          if (codexDocWithType) {
+            newDocText = setNodeType(codexDocWithType, node, newType);
+            node.type = newType;
+          }
         }
       }
 
@@ -1043,6 +683,25 @@ export class WriterViewManager {
         // Parse based on current file type
         if (currentPath.toLowerCase().endsWith('.json')) {
           data = JSON.parse(content);
+        } else if (isMarkdownFile(currentPath)) {
+          const mdDoc = parseMarkdownAsCodex(content, currentPath);
+          if (mdDoc && mdDoc.rootNode) {
+            // Build a plain object from the parsed markdown node
+            const rootNode = mdDoc.rootNode;
+            data = { name: rootNode.name } as Record<string, unknown>;
+            if (rootNode.type) data.type = rootNode.type;
+            // Get prose fields from frontmatter and body
+            const fm = mdDoc.frontmatter as Record<string, unknown> | undefined;
+            if (fm?.summary) data.summary = fm.summary;
+            if (rootNode.proseValue) data.body = rootNode.proseValue;
+            if (rootNode.attributes && rootNode.attributes.length > 0) data.attributes = rootNode.attributes;
+            if (rootNode.contentSections && rootNode.contentSections.length > 0) data.contentSections = rootNode.contentSections;
+            if (rootNode.images && rootNode.images.length > 0) data.images = rootNode.images;
+            if (rootNode.tags && rootNode.tags.length > 0) data.tags = rootNode.tags;
+          } else {
+            vscode.window.showErrorMessage('Unable to parse Markdown file for conversion.');
+            return;
+          }
         } else {
           data = YAML.parse(content);
         }
@@ -1106,9 +765,9 @@ export class WriterViewManager {
     }
 
     try {
-      const filePath = documentUri.fsPath;
-      const fileName = filePath.toLowerCase();
-      const originalText = await fsPromises.readFile(filePath, 'utf-8');
+      const fileName = documentUri.fsPath.toLowerCase();
+      const document = await vscode.workspace.openTextDocument(documentUri);
+      const originalText = document.getText();
       let newDocText: string | null = null;
 
       if (isMarkdownFile(fileName)) {
@@ -1128,7 +787,16 @@ export class WriterViewManager {
         return;
       }
 
-      await fsPromises.writeFile(filePath, newDocText, 'utf-8');
+      const edit = new vscode.WorkspaceEdit();
+      const fullRange = new vscode.Range(
+        document.positionAt(0),
+        document.positionAt(originalText.length)
+      );
+      edit.replace(documentUri, fullRange, newDocText);
+      const success = await vscode.workspace.applyEdit(edit);
+      if (success) {
+        await document.save();
+      }
 
       // Update in-memory node and panel title for consistency
       node.name = trimmed;
@@ -1150,6 +818,10 @@ export class WriterViewManager {
     attributes: CodexAttribute[]
   ): Promise<void> {
     try {
+      if (isMarkdownFile(documentUri.fsPath)) {
+        vscode.window.showWarningMessage('Attributes are not yet supported for Markdown/Codex Lite files.');
+        return;
+      }
       const document = await vscode.workspace.openTextDocument(documentUri);
       const codexDoc = parseCodex(document.getText());
 
@@ -1187,6 +859,10 @@ export class WriterViewManager {
     contentSections: CodexContentSection[]
   ): Promise<void> {
     try {
+      if (isMarkdownFile(documentUri.fsPath)) {
+        vscode.window.showWarningMessage('Content sections are not yet supported for Markdown/Codex Lite files.');
+        return;
+      }
       const document = await vscode.workspace.openTextDocument(documentUri);
       const codexDoc = parseCodex(document.getText());
 
@@ -1264,6 +940,10 @@ export class WriterViewManager {
           break;
 
         case 'attributes':
+          if (isMarkdownFile(fileName)) {
+            vscode.window.showWarningMessage('Attributes are not yet supported for Markdown files.');
+            return;
+          }
           // Initialize empty attributes array if it doesn't exist
           if (!node.hasAttributes || !node.attributes || node.attributes.length === 0) {
             newDocText = setNodeAttributes(codexDoc, node, []);
@@ -1276,6 +956,10 @@ export class WriterViewManager {
           break;
 
         case 'content':
+          if (isMarkdownFile(fileName)) {
+            vscode.window.showWarningMessage('Content sections are not yet supported for Markdown files.');
+            return;
+          }
           // Initialize empty content sections array if it doesn't exist
           if (!node.hasContentSections || !node.contentSections || node.contentSections.length === 0) {
             newDocText = setNodeContentSections(codexDoc, node, []);
@@ -1401,29 +1085,33 @@ export class WriterViewManager {
         const { url, caption } = message;
         await this.withFileLock(documentUri.fsPath, async () => {
           try {
-            const text = await fsPromises.readFile(documentUri.fsPath, 'utf-8');
-            const doc = YAML.parseDocument(text);
-            const targetNode = this.findNodeInYamlDoc(doc, node);
-            if (!targetNode) {
-              vscode.window.showErrorMessage('Could not find node in document');
-              return;
-            }
-            const images = targetNode.get('images');
-            if (!images || !YAML.isSeq(images)) { return; }
-            for (const item of images.items) {
-              if (YAML.isMap(item)) {
-                const itemUrl = item.get('url');
-                if (itemUrl === url) {
-                  if (caption) {
-                    item.set('caption', caption);
-                  } else {
-                    item.delete('caption');
+            await this.mutateNodeImages(
+              documentUri, node,
+              (_doc, targetNode) => {
+                const images = targetNode.get('images');
+                if (!images || !YAML.isSeq(images)) { return; }
+                for (const item of images.items) {
+                  if (YAML.isMap(item)) {
+                    if (item.get('url') === url) {
+                      if (caption) { item.set('caption', caption); }
+                      else { item.delete('caption'); }
+                      break;
+                    }
                   }
-                  break;
+                }
+              },
+              (_root, targetNode) => {
+                const images = targetNode.images as Array<Record<string, unknown>> | undefined;
+                if (!images) { return; }
+                for (const img of images) {
+                  if (img.url === url) {
+                    if (caption) { img.caption = caption; }
+                    else { delete img.caption; }
+                    break;
+                  }
                 }
               }
-            }
-            await fsPromises.writeFile(documentUri.fsPath, doc.toString());
+            );
             safePostMessage(panel, { type: 'imageCaptionSaved', url });
           } catch (error) {
             console.error('Failed to save caption:', error);
@@ -1450,7 +1138,9 @@ export class WriterViewManager {
       }
 
       case 'importImage':
-        await this.handleImportImage(panel, documentUri, node, workspaceRoot);
+        await this.withFileLock(documentUri.fsPath, async () => {
+          await this.handleImportImage(panel, documentUri, node, workspaceRoot);
+        });
         return true;
 
       case 'deleteImage':
@@ -1578,40 +1268,32 @@ export class WriterViewManager {
     index: number
   ): Promise<void> {
     try {
-      const text = await fsPromises.readFile(documentUri.fsPath, 'utf-8');
-      const doc = YAML.parseDocument(text);
-
-      const targetNode = this.findNodeInYamlDoc(doc, node);
-      if (!targetNode) {
-        vscode.window.showErrorMessage('Could not find node in document');
-        return;
-      }
-
-      const images = targetNode.get('images');
-      if (!images || !YAML.isSeq(images)) {
-        return;
-      }
-
-      // Find and remove image by URL
-      const items = (images as YAML.YAMLSeq).items;
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (YAML.isMap(item)) {
-          const itemUrl = item.get('url');
-          if (itemUrl === url) {
-            (images as YAML.YAMLSeq).delete(i);
-            break;
+      await this.mutateNodeImages(
+        documentUri, node,
+        (_doc, targetNode) => {
+          const images = targetNode.get('images');
+          if (!images || !YAML.isSeq(images)) { return; }
+          const items = (images as YAML.YAMLSeq).items;
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (YAML.isMap(item) && item.get('url') === url) {
+              (images as YAML.YAMLSeq).delete(i);
+              break;
+            }
+          }
+          if ((images as YAML.YAMLSeq).items.length === 0) {
+            targetNode.delete('images');
+          }
+        },
+        (_root, targetNode) => {
+          const images = targetNode.images as Array<Record<string, unknown>> | undefined;
+          if (!images) { return; }
+          targetNode.images = images.filter(img => img.url !== url);
+          if ((targetNode.images as unknown[]).length === 0) {
+            delete targetNode.images;
           }
         }
-      }
-
-      // If no images left, remove the images key
-      if ((images as YAML.YAMLSeq).items.length === 0) {
-        targetNode.delete('images');
-      }
-
-      await fsPromises.writeFile(documentUri.fsPath, doc.toString());
-
+      );
       safePostMessage(panel, { type: 'imageDeleted', url, index });
     } catch (error) {
       console.error('Failed to delete image:', error);
@@ -1630,47 +1312,105 @@ export class WriterViewManager {
     order: string[]
   ): Promise<void> {
     try {
-      const text = await fsPromises.readFile(documentUri.fsPath, 'utf-8');
-      const doc = YAML.parseDocument(text);
-
-      const targetNode = this.findNodeInYamlDoc(doc, node);
-      if (!targetNode) {
-        vscode.window.showErrorMessage('Could not find node in document');
-        return;
-      }
-
-      const images = targetNode.get('images');
-      if (!images || !YAML.isSeq(images)) {
-        return;
-      }
-
-      // Create a map of URL to image node
-      const imageMap = new Map<string, YAML.Node>();
-      for (const item of (images as YAML.YAMLSeq).items) {
-        if (YAML.isMap(item)) {
-          const url = item.get('url') as string;
-          if (url) {
-            imageMap.set(url, item);
+      await this.mutateNodeImages(
+        documentUri, node,
+        (_doc, targetNode) => {
+          const images = targetNode.get('images');
+          if (!images || !YAML.isSeq(images)) { return; }
+          const imageMap = new Map<string, YAML.Node>();
+          for (const item of (images as YAML.YAMLSeq).items) {
+            if (YAML.isMap(item)) {
+              const url = item.get('url') as string;
+              if (url) { imageMap.set(url, item); }
+            }
           }
+          (images as YAML.YAMLSeq).items = [];
+          for (const url of order) {
+            const imgNode = imageMap.get(url);
+            if (imgNode) { (images as YAML.YAMLSeq).add(imgNode); }
+          }
+        },
+        (_root, targetNode) => {
+          const images = targetNode.images as Array<Record<string, unknown>> | undefined;
+          if (!images) { return; }
+          const imageMap = new Map<string, Record<string, unknown>>();
+          for (const img of images) {
+            if (img.url && typeof img.url === 'string') { imageMap.set(img.url, img); }
+          }
+          targetNode.images = order
+            .map(url => imageMap.get(url))
+            .filter((img): img is Record<string, unknown> => img !== undefined);
         }
-      }
-
-      // Clear and rebuild in new order
-      (images as YAML.YAMLSeq).items = [];
-      for (const url of order) {
-        const imgNode = imageMap.get(url);
-        if (imgNode) {
-          (images as YAML.YAMLSeq).add(imgNode);
-        }
-      }
-
-      await fsPromises.writeFile(documentUri.fsPath, doc.toString());
-
+      );
       safePostMessage(panel, { type: 'imagesReordered' });
     } catch (error) {
       console.error('Failed to reorder images:', error);
       vscode.window.showErrorMessage('Failed to reorder images.');
       safePostMessage(panel, { type: 'imageReorderError', message: 'Failed to reorder images' });
+    }
+  }
+
+  /**
+   * Read, mutate, and write a codex file in a format-safe way.
+   * For YAML: uses YAML AST surgery (preserves formatting).
+   * For JSON: parses as object, calls mutator, writes JSON.
+   * For Markdown: rejects (images not supported).
+   */
+  private async mutateNodeImages(
+    documentUri: vscode.Uri,
+    node: CodexNode,
+    yamlMutator: (doc: YAML.Document, targetNode: YAML.YAMLMap) => void,
+    jsonMutator: (root: any, targetNode: Record<string, unknown>) => void
+  ): Promise<void> {
+    if (isMarkdownFile(documentUri.fsPath)) {
+      vscode.window.showErrorMessage('Image editing is not supported for Markdown files.');
+      return;
+    }
+
+    const document = await vscode.workspace.openTextDocument(documentUri);
+    const text = document.getText();
+
+    let newText: string;
+    if (isJsonContent(text)) {
+      const obj = JSON.parse(text);
+      let current: unknown = obj;
+      for (const segment of node.path) {
+        if (current === null || current === undefined) {
+          vscode.window.showErrorMessage('Could not find node in JSON document');
+          return;
+        }
+        current = (current as Record<string, unknown>)[segment as string];
+      }
+      if (!current || typeof current !== 'object' || Array.isArray(current)) {
+        // Root node case
+        if (node.path.length === 0) {
+          current = obj;
+        } else {
+          vscode.window.showErrorMessage('Could not find node in JSON document');
+          return;
+        }
+      }
+      jsonMutator(obj, current as Record<string, unknown>);
+      newText = JSON.stringify(obj, null, 2);
+    } else {
+      const yamlDoc = YAML.parseDocument(text);
+      const targetNode = this.findNodeInYamlDoc(yamlDoc, node);
+      if (!targetNode) {
+        vscode.window.showErrorMessage('Could not find node in document');
+        return;
+      }
+      yamlMutator(yamlDoc, targetNode);
+      newText = yamlDoc.toString();
+    }
+
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(documentUri, new vscode.Range(
+      document.positionAt(0),
+      document.positionAt(text.length)
+    ), newText);
+    const success = await vscode.workspace.applyEdit(edit);
+    if (success) {
+      await document.save();
     }
   }
 
@@ -1884,7 +1624,7 @@ export class WriterViewManager {
 
     for (const file of files) {
       let targetPath: string;
-      let filename = path.basename(file.fsPath);
+      const filename = path.basename(file.fsPath);
 
       // Check for duplicate by content hash
       const duplicate = await this.findDuplicateImage(file.fsPath, workspaceRoot);
@@ -1983,42 +1723,43 @@ export class WriterViewManager {
   }
 
   /**
-   * Add images to node's YAML array
+   * Add images to node's document (format-safe for YAML and JSON)
    */
   private async addImagesToNode(
     documentUri: vscode.Uri,
     node: CodexNode,
     newImages: CodexImage[]
   ): Promise<void> {
-    const text = await fsPromises.readFile(documentUri.fsPath, 'utf-8');
-    const doc = YAML.parseDocument(text);
-
-    // Find the node in the document
-    const targetNode = this.findNodeInYamlDoc(doc, node);
-    if (!targetNode) {
-      throw new Error('Could not find node in document');
-    }
-
-    // Get or create images array
-    let images = targetNode.get('images');
-    if (!images || !YAML.isSeq(images)) {
-      images = doc.createNode([]);
-      targetNode.set('images', images);
-    }
-
-    // Add new images
-    for (const img of newImages) {
-      const imgObj: Record<string, unknown> = { url: img.url };
-      if (img.caption) imgObj.caption = img.caption;
-      if (img.alt) imgObj.alt = img.alt;
-      if (img.featured) imgObj.featured = img.featured;
-
-      const imgNode = doc.createNode(imgObj);
-      (images as YAML.YAMLSeq).add(imgNode);
-    }
-
-    // Write back
-    await fsPromises.writeFile(documentUri.fsPath, doc.toString());
+    await this.mutateNodeImages(
+      documentUri, node,
+      (doc, targetNode) => {
+        let images = targetNode.get('images');
+        if (!images || !YAML.isSeq(images)) {
+          images = doc.createNode([]);
+          targetNode.set('images', images);
+        }
+        for (const img of newImages) {
+          const imgObj: Record<string, unknown> = { url: img.url };
+          if (img.caption) imgObj.caption = img.caption;
+          if (img.alt) imgObj.alt = img.alt;
+          if (img.featured) imgObj.featured = img.featured;
+          const imgNode = doc.createNode(imgObj);
+          (images as YAML.YAMLSeq).add(imgNode);
+        }
+      },
+      (_root, targetNode) => {
+        if (!targetNode.images || !Array.isArray(targetNode.images)) {
+          targetNode.images = [];
+        }
+        for (const img of newImages) {
+          const imgObj: Record<string, unknown> = { url: img.url };
+          if (img.caption) imgObj.caption = img.caption;
+          if (img.alt) imgObj.alt = img.alt;
+          if (img.featured) imgObj.featured = img.featured;
+          (targetNode.images as Array<Record<string, unknown>>).push(imgObj);
+        }
+      }
+    );
   }
 
   /**

@@ -1,8 +1,10 @@
 /**
  * Index Boilerplate Generator
- * 
+ *
  * Creates default index.codex.yaml files with sensible defaults
  */
+
+import { execSync } from 'child_process';
 
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -105,7 +107,6 @@ function detectProjectEmoji(projectName: string): string {
  */
 async function detectAuthor(workspaceRoot: string): Promise<string | null> {
   try {
-    const { execSync } = require('child_process');
     const authorName = execSync('git config user.name', {
       cwd: workspaceRoot,
       encoding: 'utf-8',

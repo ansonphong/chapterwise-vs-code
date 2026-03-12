@@ -21,6 +21,7 @@ import { minimatch } from 'minimatch';
  */
 function log(message: string): void {
   // Import dynamically to avoid circular dependency
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const ext = require('./extension');
   const channel = ext.getOutputChannel();
   if (channel) {
@@ -594,7 +595,7 @@ async function loadAndParseCodexFile(
   workspaceRoot: string
 ): Promise<any> {
   const content = fs.readFileSync(filePath, 'utf-8');
-  let data = YAML.parse(content);
+  const data = YAML.parse(content);
 
   // Check if file needs auto-fixing
   if (hasMissingIds(data)) {
@@ -920,7 +921,7 @@ async function createFileNode(
 
   // Base file node structure with Phase 2 discriminator
   const baseNode: any = {
-    id: `file-${relative.replace(/[\\/\.]/g, '-')}`,
+    id: `file-${relative.replace(/[\\/.]/g, '-')}`,
     type,
     name, // Will be updated from file content
     _node_kind: 'file', // Phase 2: Discriminator

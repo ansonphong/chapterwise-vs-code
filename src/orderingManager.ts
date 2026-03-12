@@ -74,7 +74,7 @@ export class OrderingManager {
    * Adds new files not in index, removes entries for deleted files.
    */
   async syncWithFilesystem(): Promise<void> {
-    let index = await this.readIndex();
+    const index = await this.readIndex();
     if (!index) {
       await this.generateFromFilesystem();
       return;

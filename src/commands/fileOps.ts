@@ -97,6 +97,10 @@ export function registerFileOpsCommands(
       const oldFullPath = path.join(wsRoot, oldPath);
       const newFullPath = path.join(wsRoot, newPath);
       const { isPathWithinWorkspace } = await import('../writerView/utils/helpers');
+      if (!isPathWithinWorkspace(oldFullPath, wsRoot)) {
+        vscode.window.showErrorMessage('Source path is outside workspace.');
+        return;
+      }
       if (!isPathWithinWorkspace(newFullPath, wsRoot)) {
         vscode.window.showErrorMessage('Folder path resolves outside workspace');
         return;
@@ -195,6 +199,11 @@ export function registerFileOpsCommands(
       const cp = treeItem.indexNode._computed_path;
       if (!cp) return;
       const fullPath = path.join(wsRoot, cp);
+      const { isPathWithinWorkspace } = await import('../writerView/utils/helpers');
+      if (!isPathWithinWorkspace(fullPath, wsRoot)) {
+        vscode.window.showErrorMessage('Path is outside workspace.');
+        return;
+      }
       await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(fullPath));
     })
   );

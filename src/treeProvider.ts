@@ -63,6 +63,7 @@ function getNodeOriginalInclude(node: IndexChildNode): string | undefined {
  */
 function log(message: string): void {
   // Use dynamic import to avoid circular dependency
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const ext = require('./extension');
   const channel = ext.getOutputChannel();
   if (channel) {

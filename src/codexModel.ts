@@ -152,7 +152,7 @@ export function isCodexLikeFile(fileName: string): boolean {
 /**
  * Determines if the content is JSON
  */
-function isJsonContent(text: string): boolean {
+export function isJsonContent(text: string): boolean {
   const trimmed = text.trim();
   return trimmed.startsWith('{') || trimmed.startsWith('[');
 }

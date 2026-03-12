@@ -3,6 +3,7 @@
  */
 
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { CodexNode } from '../../codexModel';
 import { escapeHtml, getNonce } from '../utils/helpers';
 import { getWriterViewStyles } from '../styles';
@@ -54,7 +55,6 @@ export function buildWebviewHtml(options: WebviewHtmlOptions): string {
   const hasBody = node.availableFields.includes('body');
 
   // Calculate relative path for display
-  const path = require('path');
   const relativePath = workspaceRoot
     ? path.relative(workspaceRoot, filePath)
     : path.basename(filePath);

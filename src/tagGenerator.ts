@@ -90,7 +90,7 @@ export class TagGenerator {
    * Normalize a token (lowercase, trim, basic plural removal)
    */
   private normalizeToken(word: string): string {
-    let w = word.replace(/^[-'_]+|[-'_]+$/g, '');
+    const w = word.replace(/^[-'_]+|[-'_]+$/g, '');
     let lw = w.toLowerCase();
 
     // Basic plural trim
@@ -175,14 +175,14 @@ export class TagGenerator {
 
       // Tokenization pattern (Unicode letters with hyphen/apostrophe inside)
       // Uses Unicode property escapes to support all scripts (Latin, CJK, Cyrillic, Arabic, etc.)
-      const tokenPattern = /\p{L}[\p{L}'\-]*/gu;
+      const tokenPattern = /\p{L}[\p{L}'-]*/gu;
 
       // Validation pattern for token content (must contain at least one Unicode letter)
       const hasLetterPattern = /\p{L}/u;
 
       // Extract main body tokens
       const bodyTokensRaw = text.match(tokenPattern) || [];
-      let bodyTokens = bodyTokensRaw
+      const bodyTokens = bodyTokensRaw
         .filter(t => t.length >= 2) // Lowered to 2 for CJK (single CJK char can be meaningful)
         .map(t => this.normalizeToken(t))
         .filter(t => hasLetterPattern.test(t) && !STOPWORDS.has(t));

@@ -364,7 +364,7 @@ export class CodexExploder {
     const safeId = this.sanitizeFilename(childId);
 
     // Replace placeholders
-    let outputStr = pattern
+    const outputStr = pattern
       .replace(/\{type\}/g, safeType)
       .replace(/\{name\}/g, safeName)
       .replace(/\{id\}/g, safeId)
@@ -406,6 +406,7 @@ export class CodexExploder {
     let safeName = name.startsWith('.') ? name.substring(1) : name;
 
     // Remove or replace invalid filename characters
+    // eslint-disable-next-line no-control-regex
     safeName = safeName.replace(/[<>:"/\\|?*\x00-\x1f]/g, '');
 
     // === SECURITY: Remove path traversal sequences after character replacement ===

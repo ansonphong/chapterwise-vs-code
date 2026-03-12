@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import * as path from 'path';
 import { escapeHtml, isPathWithinWorkspace, getNonce } from './helpers';
 
 describe('escapeHtml', () => {
@@ -72,19 +73,20 @@ describe('isPathWithinWorkspace', () => {
     expect(isPathWithinWorkspace('file.md', '')).toBe(false);
   });
 
-  it('accepts absolute path within workspace', () => {
-    expect(isPathWithinWorkspace('/workspace/project/file.md', root)).toBe(true);
+  it('rejects absolute path outside workspace', () => {
+    expect(isPathWithinWorkspace('/etc/passwd', root)).toBe(false);
   });
 
-  it('treats absolute-looking paths as relative after leading slash strip', () => {
-    // The function strips leading '/' so '/etc/passwd' becomes 'etc/passwd'
-    // which resolves to /workspace/project/etc/passwd (inside workspace)
-    expect(isPathWithinWorkspace('/etc/passwd', root)).toBe(true);
+  it('rejects absolute path to another directory', () => {
+    expect(isPathWithinWorkspace('/tmp/evil/file.md', root)).toBe(false);
   });
 
-  it('handles leading slash stripping for relative paths', () => {
-    // The function strips leading slash before resolve, so /subdir becomes subdir
-    expect(isPathWithinWorkspace('/subdir/file.md', root)).toBe(true);
+  it('accepts absolute path genuinely inside workspace', () => {
+    expect(isPathWithinWorkspace(path.resolve(root, 'chapter1.md'), root)).toBe(true);
+  });
+
+  it('accepts absolute path to a subdirectory inside workspace', () => {
+    expect(isPathWithinWorkspace(path.resolve(root, 'subdir/file.md'), root)).toBe(true);
   });
 });
 

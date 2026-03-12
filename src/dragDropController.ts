@@ -114,7 +114,7 @@ export class CodexDragAndDropController implements vscode.TreeDragAndDropControl
           type: 'index' as const,
           id: item.indexNode.id,
           name: item.indexNode.name,
-          filePath: item.getFilePath(),
+          filePath: item.indexNode._computed_path || '',
           documentUri: item.documentUri.toString(),
         };
       } else if (item instanceof CodexTreeItem) {
