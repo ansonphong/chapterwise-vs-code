@@ -48,6 +48,14 @@ code --install-extension *.vsix --force
 - `writerView/toolbar/` — Contextual toolbar
 - `writerView/utils/helpers.ts` — `escapeHtml()`, `isPathWithinWorkspace()`, `safePostMessage()`
 
+## Brand Voice
+
+> **Canonical reference:** `../../.claude/references/brand-voice.md` — read before writing ANY user-facing text.
+
+A confident technical mentor who treats writing as engineering. Philosophy first, features second. Developer metaphors are the identity ("IDE for Writers," "debug your plot"), not decoration. Honest capability, zero hype. Chaos → Clarity. Ownership always (open formats, no lock-in). Never theatrical, never condescending, never vague. Writer-facing text says "manuscript" not "file," "chapter" not "node," "project" not "repo." Analysis reads like editorial feedback. Errors: "[What went wrong] — [What to do about it]." Progress: specific data, no filler.
+
+This extension is the primary writer interface — tree labels, status bar text, error notifications, context menu items, and Writer View copy all carry the voice directly.
+
 ## Testing
 
 ### Three-Layer Test Architecture
