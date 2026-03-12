@@ -763,11 +763,15 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
     if (workspaceFolder) {
       this.currentContext.workspaceRoot = workspaceFolder.uri.fsPath;
 
-      // If opening an index file, extract the context folder from its path
       if (isIndexFile(document.fileName)) {
+        // Extract context folder from index file path
         const relativePath = path.relative(workspaceFolder.uri.fsPath, document.fileName);
         const indexFolder = path.dirname(relativePath);
         this.currentContext.contextFolder = indexFolder;
+      } else {
+        // Switching to a regular file — clear folder context so
+        // reloadTreeIndex/regenerateAndReload don't target the old folder
+        this.currentContext.contextFolder = null;
       }
     }
 
