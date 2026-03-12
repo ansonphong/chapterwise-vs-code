@@ -880,6 +880,11 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
     this.currentContext.workspaceRoot = workspaceRoot;
     this.currentContext.contextFolder = folderPath;
 
+    // Clear stale activeDocument so the onDidChangeTextDocument watcher
+    // won't reparse the old file and yank the tree out of index mode
+    this.activeDocument = null;
+    this.codexDoc = null;
+
     if (folderPath) {
       const indexPath = path.join(workspaceRoot, folderPath, '.index.codex.json');
 
