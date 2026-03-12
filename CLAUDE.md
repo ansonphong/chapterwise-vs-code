@@ -113,10 +113,28 @@ code --install-extension *.vsix --force
 - **Runtime deps**: `yaml`, `minimatch`
 - **External**: `vscode` (not bundled)
 
+## Context
+
+- `.claude/context/` — internal architecture docs for this repo
+- `../../.claude/context/chapterwise-codex.md` — cross-repo summary in parent
+- `../../.claude/references/chapterwise-codex.md` — exhaustive reference in parent
+
 ## Plans
 
-All implementation plans MUST be saved to `.claude/plans/` (not `docs/plans/`).
+Plans are centralized in the parent workspace, NOT in this repo:
+- Active plans: `../../.claude/plans/vs-code/`
+- Archives: `../../.claude/plans/vs-code/_archive/`
 
-Format: `.claude/plans/YYYY-MM-DD-<feature-name>.md`
+## Post-Plan Workflow
 
-After a plan is fully executed and verified, move it to `.claude/plans/_archive/`.
+After implementing any plan:
+1. Update `.claude/context/` files to reflect new reality
+2. Add dated one-liner to Recent Changes below
+3. Update parent context: `../../.claude/context/chapterwise-codex.md`
+4. Archive the plan in `../../.claude/plans/vs-code/_archive/`
+5. Update `../../.claude/STATUS.md` and `../../.claude/exec-order.md`
+
+## Recent Changes
+
+- 2026-03-12: Extension hardening — refactored extension.ts, tree provider context state fixes
+- 2026-03-11: Testing suite overhaul — 262 tests across 11 suites
