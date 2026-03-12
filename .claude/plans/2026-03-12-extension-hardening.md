@@ -10,6 +10,16 @@
 
 **Scope:** 18 tasks total. Tasks 1-10 from review pass 1, Tasks 11-18 from review pass 2.
 
+## Rename Interaction
+
+- **Recommended order:** run this hardening plan before `.claude/plans/rename/00-master-plan.md`.
+- This plan intentionally refers to the current pre-rename identifiers (`chapterwiseCodex.*`, `StudioPhong.chapterwise-codex`, `chapterwise-codex-*.vsix`).
+- Do **not** fold the product rename into this plan. Keep behavior fixes isolated; let the rename plan do the identifier sweep afterward.
+- If the rename plan has already been applied, use the renamed equivalents when implementing examples in this plan:
+  - `chapterwiseCodex.*` → `chapterwise.*`
+  - `StudioPhong.chapterwise-codex` → `StudioPhong.chapterwise`
+  - `chapterwise-codex-<version>.vsix` → `chapterwise-<version>.vsix`
+
 ---
 
 ## Task 1: Fix `isPathWithinWorkspace` Security Flaw
@@ -22,7 +32,7 @@ The helper strips leading `/` before resolving, so absolute paths like `/etc/pas
 
 **Step 1: Update the failing tests**
 
-Change the two tests that currently bless the broken behavior to assert `false`:
+Change the two tests that currently bless the broken behavior to assert `false`. Use `path.resolve(root, ...)` for the absolute-inside-workspace cases so the test stays platform-safe:
 
 ```typescript
 // src/writerView/utils/helpers.test.ts — replace lines 75-88
@@ -36,11 +46,11 @@ it('rejects absolute path to another directory', () => {
 });
 
 it('accepts absolute path genuinely inside workspace', () => {
-  expect(isPathWithinWorkspace('/workspace/project/chapter1.md', root)).toBe(true);
+  expect(isPathWithinWorkspace(path.resolve(root, 'chapter1.md'), root)).toBe(true);
 });
 
 it('accepts absolute path to a subdirectory inside workspace', () => {
-  expect(isPathWithinWorkspace('/workspace/project/subdir/file.md', root)).toBe(true);
+  expect(isPathWithinWorkspace(path.resolve(root, 'subdir/file.md'), root)).toBe(true);
 });
 ```
 
@@ -166,7 +176,7 @@ private async mutateNodeImages(
   documentUri: vscode.Uri,
   node: CodexNode,
   yamlMutator: (doc: YAML.Document, targetNode: YAML.YAMLMap) => void,
-  jsonMutator: (obj: any, nodePath: string[]) => void
+  jsonMutator: (root: any, targetNode: Record<string, unknown>) => void
 ): Promise<void> {
   const filePath = documentUri.fsPath;
 
@@ -180,8 +190,19 @@ private async mutateNodeImages(
 
   if (isJsonContent(text)) {
     const obj = JSON.parse(text);
-    const nodePath = this.getNodePathSegments(node);
-    jsonMutator(obj, nodePath);
+    let current: unknown = obj;
+    for (const segment of node.path) {
+      if (current === null || current === undefined) {
+        vscode.window.showErrorMessage('Could not find node in JSON document');
+        return;
+      }
+      current = (current as Record<string, unknown>)[segment as string];
+    }
+    if (!current || typeof current !== 'object' || Array.isArray(current)) {
+      vscode.window.showErrorMessage('Could not find node in JSON document');
+      return;
+    }
+    jsonMutator(obj, current as Record<string, unknown>);
     newText = JSON.stringify(obj, null, 2);
   } else {
     const doc = YAML.parseDocument(text);
@@ -198,25 +219,17 @@ private async mutateNodeImages(
 }
 ```
 
-**Step 3: Add `getNodePathSegments` helper**
+**Step 3: Do not add an ID/name lookup helper**
 
-This helper navigates a parsed JSON object to find the target node by matching `node.id` or `node.name`:
-
-```typescript
-private getNodePathSegments(node: CodexNode): string[] {
-  // Build path segments to locate node in JSON structure
-  // The node's id or name is used to find it
-  return [node.id || node.name];
-}
-```
+Do not locate JSON nodes via `node.id` or `node.name`. That is too weak for nested documents and can hit the wrong node when names repeat. `CodexNode.path` already contains the exact path segments for both YAML and JSON traversal, so reuse `node.path` directly in the helper above and skip any extra `getNodePathSegments()` method.
 
 **Step 4: Refactor `updateImageCaption` to use the helper**
 
-Replace the body of the caption-save handler (inside `withFileLock`) to use `mutateNodeImages` with both YAML and JSON mutators. The YAML mutator iterates `images.items` to find the matching URL and sets/deletes the caption. The JSON mutator finds the node's `images` array and updates the caption by URL.
+Replace the body of the caption-save handler (inside `withFileLock`) to use `mutateNodeImages` with both YAML and JSON mutators. The YAML mutator iterates `images.items` to find the matching URL and sets/deletes the caption. The JSON mutator updates `targetNode.images` by URL.
 
 **Step 5: Refactor `handleDeleteImage` similarly**
 
-Replace `YAML.parseDocument`/`doc.toString()` with `mutateNodeImages`, providing both a YAML mutator (splice from `YAMLSeq`) and a JSON mutator (filter the images array).
+Replace `YAML.parseDocument`/`doc.toString()` with `mutateNodeImages`, providing both a YAML mutator (splice from `YAMLSeq`) and a JSON mutator (filter `targetNode.images`).
 
 **Step 6: Refactor `handleReorderImages` similarly**
 
@@ -597,12 +610,12 @@ The extension activates on `onStartupFinished` for every workspace, even those w
 ]
 ```
 
-The `onView:*` events are implicit from the view contributions in `package.json` (VS Code 1.74+). Command activation events are implicit from registered commands. Language activation is implicit from `languages` contributions. Together these cover all entry points:
+The `onView:*` events are implicit from the view contributions in `package.json` (VS Code 1.74+). Command activation events are implicit from contributed commands. Do not claim language activation here — this extension does not currently contribute languages. Together these cover the real entry points:
 
 - **Workspace has Codex files** → `workspaceContains` fires at startup
 - **User clicks sidebar** → implicit `onView` fires
 - **User runs command from palette** → implicit `onCommand` fires
-- **User opens a `.codex.yaml`** → implicit `onLanguage` fires
+- **User opens a Codex workspace view or runs a Codex command in an otherwise empty workspace** → implicit `onView` / `onCommand` fires
 
 **Step 2: Run integration tests to verify activation still works**
 
@@ -616,8 +629,8 @@ git add package.json
 git commit -m "perf: lazy activation — only activate when Codex files exist
 
 Replace onStartupFinished with workspaceContains globs. Combined
-with implicit onView, onCommand, and onLanguage events from VS Code
-1.74+, the extension activates on-demand instead of on every startup."
+with implicit onView and onCommand activation from VS Code 1.74+,
+the extension activates on-demand instead of on every startup."
 ```
 
 ---
@@ -635,25 +648,38 @@ Run: `npx eslint --fix src/`
 
 This fixes the 10 `prefer-const` and similar auto-fixable errors.
 
-**Step 2: Fix the `require()` import in builder.ts**
+**Step 2: Fix all four `require()` import violations**
 
 ```typescript
-// src/writerView/html/builder.ts line 57 — replace:
+// Replace CommonJS require() imports with top-level ES imports in:
+// - src/indexBoilerplate.ts
+// - src/indexGenerator.ts
+// - src/treeProvider.ts
+// - src/writerView/html/builder.ts
 const path = require('path');
 
 // with (add to top-level imports):
 import * as path from 'path';
 ```
 
-Remove the inline `require` since `path` should already be imported at the top of the file, or add it to the existing imports.
+Remove the inline `require` in each file and replace it with a normal top-level import.
 
 **Step 3: Fix remaining manual lint errors**
 
-Address remaining non-auto-fixable errors individually. Most are `prefer-const` that weren't caught by `--fix` or stray `any` types.
+Address the remaining errors explicitly:
+
+- `src/commands/navigation.ts`: remove the useless `targetNode` assignment flagged by `no-useless-assignment`
+- `src/explodeCodex.ts`: fix one `prefer-const` and the `no-control-regex` pattern
+- `src/indexGenerator.ts`: fix one `prefer-const` and the `no-useless-escape` regex
+- `src/orderingManager.ts`: fix one `prefer-const`
+- `src/tagGenerator.ts`: fix two `prefer-const` violations and one `no-useless-escape`
+- `src/writerView/manager.ts`: fix the remaining `prefer-const` violations
+
+Do not leave this as a vague "clean up whatever is left" step; the error list is known now.
 
 **Step 4: Run lint to verify zero errors**
 
-Run: `npm run lint 2>&1 | grep "error" | tail -5`
+Run: `npm run lint -- --quiet`
 Expected: 0 errors (warnings are acceptable for now)
 
 **Step 5: Run full test suite**
@@ -768,30 +794,18 @@ if (currentPath.toLowerCase().endsWith('.json')) {
 if (currentPath.toLowerCase().endsWith('.json')) {
     data = JSON.parse(content);
 } else if (isMarkdownFile(currentPath)) {
-    // Convert markdown frontmatter + body to Codex object
-    const codexDoc = parseMarkdownAsCodex(content, currentPath);
-    if (!codexDoc || !codexDoc.rootNode) {
-      vscode.window.showErrorMessage('Unable to parse Markdown document for conversion.');
-      return;
+    const converter = new CodexMarkdownConverter();
+    const result = converter.convertMarkdownToCodex(content, currentPath);
+    data = result.codex;
+    if (result.warnings.length > 0) {
+      vscode.window.showWarningMessage(result.warnings[0]);
     }
-    // Build a Codex-compatible data object from the parsed node
-    const node = codexDoc.rootNode;
-    data = {
-      name: node.name,
-      type: node.type || 'document',
-      id: node.id,
-      metadata: codexDoc.metadata || {},
-    };
-    if (node.summary) data.summary = node.summary;
-    if (node.body) data.body = node.body;
-    if (node.attributes && node.attributes.length > 0) data.attributes = node.attributes;
-    if (node.contentSections && node.contentSections.length > 0) data.content = node.contentSections;
 } else {
     data = YAML.parse(content);
 }
 ```
 
-`isMarkdownFile` and `parseMarkdownAsCodex` are already imported in `manager.ts`.
+`isMarkdownFile` already exists in `manager.ts`. Import `CodexMarkdownConverter` from `src/convertFormat.ts` for this path. Do not manually rebuild the object from `parseMarkdownAsCodex()` here; that drops frontmatter-derived fields such as tags/images/metadata mappings that the converter already knows how to preserve.
 
 **Step 2: Run typecheck and tests**
 
@@ -805,8 +819,8 @@ git add src/writerView/manager.ts
 git commit -m "fix: handle Save As from Markdown to YAML/JSON
 
 Markdown files with frontmatter were fed to YAML.parse() which
-throws on multi-document streams. Now uses parseMarkdownAsCodex
-to extract a proper Codex object before format conversion."
+throws on multi-document streams. Now uses CodexMarkdownConverter
+to preserve Codex Lite field mappings during format conversion."
 ```
 
 ---
@@ -919,6 +933,8 @@ function handleBodyChange() {
 }
 ```
 
+Also update `save()` and `markClean()` to clear `summaryAutoSaveTimer` and `bodyAutoSaveTimer`, so a manual save or successful save-complete does not leave stale timers queued behind it.
+
 **Step 2: Add blur-save to overview prose editors**
 
 Find where `summaryEditorContent` and `bodyEditorContent` event listeners are set up, and add blur handlers:
@@ -954,9 +970,9 @@ prose editor behavior."
 
 ---
 
-## Task 15: Wrap Image Import in File Lock
+## Task 15: Make Image Import Atomic Enough for Failures
 
-`importImage` bypasses `withFileLock` unlike all other image operations. If an import races with a concurrent image operation (delete, reorder, caption), the unguarded `addImagesToNode` read-modify-write can overwrite the concurrent operation's changes.
+`importImage` bypasses `withFileLock` unlike all other image operations. Also, `importImages()` copies files first and only then updates the document; if `addImagesToNode()` fails, the copied files are left behind as orphans.
 
 **Files:**
 - Modify: `src/writerView/manager.ts` (~line 1453)
@@ -979,22 +995,34 @@ case 'importImage':
     return true;
 ```
 
-This matches how `addExistingImage`, `deleteImage`, and `reorderImages` are wrapped. The lock serializes the entire import operation (file copy + YAML update), preventing race conditions.
+This matches how `addExistingImage`, `deleteImage`, and `reorderImages` are wrapped. The lock serializes the entire import operation, preventing race conditions.
 
-**Step 2: Run typecheck and tests**
+**Step 2: Track copied files and roll them back if document update fails**
+
+In `importImages()`:
+
+- Keep a `copiedPaths: string[]` list for files actually copied into the workspace
+- After the copy loop, wrap `addImagesToNode(documentUri, node, addedImages)` in `try/catch`
+- If the document mutation fails, attempt `fsPromises.unlink()` on each copied path and then rethrow the original error
+- Do not try to delete images that were referenced in place or reused via `useExisting`
+
+This does not make the flow fully transactional, but it closes the current orphan-file gap.
+
+**Step 3: Run typecheck and tests**
 
 Run: `npm run typecheck && npm test`
 Expected: PASS
 
-**Step 3: Commit**
+**Step 4: Commit**
 
 ```bash
 git add src/writerView/manager.ts
-git commit -m "fix: wrap importImage in withFileLock
+git commit -m "fix: harden importImage with locking and rollback
 
 importImage was the only image mutation not using the file lock,
 allowing race conditions with concurrent caption/delete/reorder
-operations on the same document."
+operations on the same document. Failed document updates now also
+clean up copied files instead of leaving orphaned images behind."
 ```
 
 ---
@@ -1125,14 +1153,19 @@ path."
 
 ## Task 18: Fix README Version Drift
 
-README shows VS Code 1.85.0 but `package.json` declares `^1.80.0`. README shows `chapterwise-codex-0.1.0.vsix` but version is `0.3.2`.
+README shows VS Code 1.85.0 but `package.json` declares `^1.80.0`. README also shows a stale install filename `chapterwise-codex-0.1.0.vsix` while `package.json` is currently `0.3.2`.
 
 **Files:**
 - Modify: `README.md`
 
 **Step 1: Update version references**
 
-Replace all occurrences of `0.1.0` with `0.3.2` in README install instructions. Update the VS Code minimum version to match `package.json` (`1.80.0`).
+Update README install instructions to use the current `package.json.version` (currently `0.3.2`) and the current extension filename shape for the branch you are on:
+
+- Pre-rename branch: `chapterwise-codex-<package.json version>.vsix`
+- Post-rename branch: `chapterwise-<package.json version>.vsix`
+
+Also update the VS Code minimum version text to match `package.json.engines.vscode` (`1.80.0`).
 
 **Step 2: Commit**
 
@@ -1141,7 +1174,7 @@ git add README.md
 git commit -m "docs: update README version references
 
 Fix VS Code minimum version (1.80.0, matching package.json engines).
-Fix extension version in install commands (0.3.2)."
+Fix extension version in install commands to match package.json."
 ```
 
 ---
@@ -1181,3 +1214,4 @@ Fix extension version in install commands (0.3.2)."
 - Task 11 depends on Task 1 (same `isPathWithinWorkspace` helper).
 - Task 7 and Task 14 both modify `script.ts` dirty tracking — do Task 7 first, then Task 14 extends it.
 - Task 17 touches the same `manager.ts` code as Tasks 3, 4, 6, 12, 13, 15 — do it last among `manager.ts` tasks to avoid merge conflicts.
+- After finishing this hardening plan, run `.claude/plans/rename/00-master-plan.md` as a separate pass.

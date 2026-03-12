@@ -68,6 +68,7 @@ Lines already using `[ChapterWise]` (no change needed): treeProvider.ts:667, 673
 - Internal model names: `codexModel.ts`, `CodexNode`, etc.
 - Format references: "ChapterWise Codex Format", "Codex Lite", "Codex Navigator" (as format terms)
 - Any code that refers to the codex file format itself
+- `test/sample.codex.yaml` — format demo fixture ("ChapterWise Codex format" is a format reference)
 - `.claude/settings.json` plugin identifier (`chapterwise-codex@chapterwise-plugins`) — separate concern
 
 ---
@@ -201,7 +202,7 @@ Every `chapterwiseCodex.` command ID literal:
 2. `README.md`:
    - Title: `# ChapterWise Codex Extension` → `# ChapterWise Extension`
    - Command examples: `ChapterWise Codex: ...` → `ChapterWise: ...`
-   - `.vsix` filename references (lines 242, 245): `chapterwise-codex-0.1.0.vsix` → `chapterwise-0.1.0.vsix`
+   - `.vsix` filename references (lines 242, 245): replace the old hardcoded filename with `chapterwise-<package.json version>.vsix` (currently `chapterwise-0.3.2.vsix`)
    - Leave the formal format link text `ChapterWise Codex Format V1.1` unchanged if format branding stays as-is
 3. `.claude/plans/`, `dev/`, and `docs/plans/` files: batch-replace old product/package references (`ChapterWise Codex`, `chapterwiseCodex`, `chapterwise-codex`) where it appears, if you want repo-wide doc consistency. This is non-critical and can be done opportunistically.
 
@@ -256,7 +257,7 @@ Steps 1-9 can be done in a single pass using find-and-replace with these ordered
 | 7 | `chapterwiseCodex` | `chapterwise` | src + package.json (catch-all for commands, settings, context keys, workspace state) |
 | 8 | `chapterwise-codex` | `chapterwise` | package.json `name` field and marketplace/package IDs |
 | 9 | `chapterwise-codex` | `chapterwise-vs-code` | scripts/sync-scrivener-scripts.sh, docs |
-| 10 | `chapterwise-codex-` (vsix refs) | `chapterwise-` | README.md |
+| 10 | `chapterwise-codex-<old version>.vsix` | `chapterwise-<package.json version>.vsix` | README.md |
 
 **Critical:** Order matters — do specific compound names (steps 1-6) before the catch-all (step 7) to avoid double-replacement. Step 2 is not a blind global replace if you are preserving formal format-brand text. Step 8 is package/package-ID scope only (not the folder references which go to step 9). The optional broader docs cleanup in Step 8 can be done after the core code/manifest pass.
 
