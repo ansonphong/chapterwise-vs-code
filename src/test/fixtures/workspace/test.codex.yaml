@@ -1,0 +1,11 @@
+metadata:
+  formatVersion: "1.1"
+  documentVersion: "1.0.0"
+id: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d"
+type: book
+name: Test Book
+children:
+  - id: "d4c3b2a1-6f5e-4b7a-9d8c-1f0e3a2b5c4d"
+    type: chapter
+    name: Chapter 1
+    body: Hello world from the test fixture.

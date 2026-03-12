@@ -6,6 +6,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    exclude: ['src/test/**', 'node_modules/**'],
     alias: {
       vscode: path.resolve(__dirname, 'src/__mocks__/vscode.ts'),
     },
