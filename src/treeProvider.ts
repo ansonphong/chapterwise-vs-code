@@ -700,7 +700,11 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
       vscode.workspace.onDidChangeTextDocument((e) => {
         try {
           if (this.activeDocument && e.document.uri.toString() === this.activeDocument.uri.toString()) {
-            this.updateCodexDoc();
+            if (isIndexFile(this.activeDocument.fileName)) {
+              this.updateIndexDoc();
+            } else {
+              this.updateCodexDoc();
+            }
           }
         } catch (error) {
           console.error('[ChapterWise] Error in onDidChangeTextDocument:', error);
