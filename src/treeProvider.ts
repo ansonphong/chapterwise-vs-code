@@ -767,7 +767,7 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
       if (isIndexFile(document.fileName)) {
         const relativePath = path.relative(workspaceFolder.uri.fsPath, document.fileName);
         const indexFolder = path.dirname(relativePath);
-        this.currentContext.contextFolder = indexFolder === '.' ? null : indexFolder;
+        this.currentContext.contextFolder = indexFolder;
       }
     }
 
