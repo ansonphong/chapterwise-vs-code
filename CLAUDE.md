@@ -88,22 +88,13 @@ code --install-extension *.vsix --force
 - **GitHub Actions**: `.github/workflows/ci.yml` — typecheck, lint, unit tests + coverage, integration tests
 - **Lint**: ESLint with `continue-on-error: true` (18 pre-existing errors to clean up)
 
-## Coding Conventions
+## Modular Rules
 
-### Must Follow
-- **Async file ops only** — Use `fs.promises`, never sync `fs.*Sync()`
-- **HTML escape all interpolations** — Use `escapeHtml()` from `writerView/utils/helpers.ts` (includes single-quote `&#039;`)
-- **Path traversal validation** — Use `isPathWithinWorkspace()` + `path.resolve()` before any file operation on user-provided paths
-- **No `as any` type bypasses** — Use proper typing, WeakMap for metadata
-- **YAML mutation locking** — Use `withFileLock()` for concurrent-safe YAML writes
-- **SVG excluded from import** — XSS vector; kept in workspace scanner only (display-only, CSP blocks scripts)
-
-### Patterns
-- WeakMap for panel metadata (resolver keys) instead of `(panel as any)`
-- `pendingDuplicateResolvers` Map + `panelResolverKeys` WeakMap for Promise-based webview dialogs
-- Resolve pending promises in `onDidDispose` to prevent hangs
-- CSP header: `img-src ${webview.cspSource} data:;` required for images
-- SHA256 content hash with size pre-filter for image deduplication
+See `.claude/rules/` for convention-specific rules that load contextually:
+- `typescript.md` — async FS, no `as any`, path validation, typing patterns
+- `webview.md` — HTML escaping, CSP headers, image handling, webview communication
+- `yaml-operations.md` — file locking, format support, mutation safety, auto-fixer
+- `testing.md` — Vitest patterns, integration tests, TDD, config split
 
 ### Tech Stack
 - **Language**: TypeScript (ES2022, strict, CommonJS)
