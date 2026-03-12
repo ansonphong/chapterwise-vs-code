@@ -935,12 +935,32 @@ export class CodexTreeProvider implements vscode.TreeDataProvider<CodexTreeItemT
         this.refresh();
       }
     } else {
-      // Reset to workspace root or FILES mode
-      this.currentContext.contextFolder = null;
-      this.currentContext.workspaceRoot = null;
+      // Reset to workspace root — load root-level index if it exists
+      this.currentContext.contextFolder = '.';
+      this.currentContext.workspaceRoot = workspaceRoot;
+      this.activeDocument = null;
+      this.codexDoc = null;
+
+      const rootIndexPath = path.join(workspaceRoot, '.index.codex.json');
+      try {
+        await fs.promises.access(rootIndexPath);
+        const indexContent = await fs.promises.readFile(rootIndexPath, 'utf-8');
+        this.indexDoc = parseIndexFileJSON(indexContent);
+        this.isIndexMode = true;
+      } catch {
+        this.indexDoc = null;
+        this.isIndexMode = false;
+      }
+
       this.isLoading = false;
       this.loadingMessage = null;
       this.refresh();
+
+      // Reinitialize search for workspace root
+      const searchManager = getSearchIndexManager();
+      if (searchManager) {
+        searchManager.initializeForContext('.', workspaceRoot);
+      }
     }
 
     // Initialize search index for new context
