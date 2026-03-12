@@ -40,22 +40,90 @@ interface ProgressUpdate {
 }
 
 /**
+ * Python command candidates in order of preference
+ * - python3: Standard on macOS/Linux
+ * - python: May be Python 3 on some systems
+ * - py: Windows Python launcher
+ */
+const PYTHON_COMMANDS = ['python3', 'python', 'py'];
+
+/** Cached Python command after successful detection */
+let cachedPythonCommand: string | null = null;
+
+/**
+ * Try to run a Python command and check if it's Python 3
+ */
+async function tryPythonCommand(cmd: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const args = cmd === 'py' ? ['-3', '--version'] : ['--version'];
+    const python = spawn(cmd, args);
+    let output = '';
+
+    python.stdout.on('data', (data: Buffer) => {
+      output += data.toString();
+    });
+
+    python.on('close', (code) => {
+      // Check if it's Python 3.x
+      const isPython3 = code === 0 && output.includes('Python 3');
+      resolve(isPython3);
+    });
+
+    python.on('error', () => resolve(false));
+  });
+}
+
+/**
+ * Find a working Python 3 command
+ * Returns the command string or null if not found
+ */
+async function findPythonCommand(): Promise<string | null> {
+  // Return cached command if available
+  if (cachedPythonCommand) {
+    return cachedPythonCommand;
+  }
+
+  for (const cmd of PYTHON_COMMANDS) {
+    if (await tryPythonCommand(cmd)) {
+      cachedPythonCommand = cmd;
+      return cmd;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Get the Python executable arguments
+ * For 'py' launcher, we need to add '-3' flag
+ */
+function getPythonArgs(pythonCmd: string, scriptArgs: string[]): string[] {
+  if (pythonCmd === 'py') {
+    return ['-3', ...scriptArgs];
+  }
+  return scriptArgs;
+}
+
+/**
  * Check if Python 3 is available
  */
 async function checkPython(): Promise<boolean> {
-  return new Promise((resolve) => {
-    const python = spawn('python3', ['--version']);
-    python.on('close', (code) => resolve(code === 0));
-    python.on('error', () => resolve(false));
-  });
+  const pythonCmd = await findPythonCommand();
+  return pythonCmd !== null;
 }
 
 /**
  * Check if required Python packages are installed
  */
 async function checkDependencies(): Promise<{ installed: boolean; missing: string[] }> {
+  const pythonCmd = await findPythonCommand();
+  if (!pythonCmd) {
+    return { installed: false, missing: ['pyyaml', 'striprtf'] };
+  }
+
   return new Promise((resolve) => {
-    const python = spawn('python3', ['-c', 'import yaml; import striprtf']);
+    const args = getPythonArgs(pythonCmd, ['-c', 'import yaml; import striprtf']);
+    const python = spawn(pythonCmd, args);
     python.on('close', (code) => {
       if (code === 0) {
         resolve({ installed: true, missing: [] });
@@ -211,10 +279,15 @@ async function runImport(
   progress: vscode.Progress<{ message?: string; increment?: number }>,
   token: vscode.CancellationToken
 ): Promise<ProgressUpdate> {
+  const pythonCmd = await findPythonCommand();
+  if (!pythonCmd) {
+    throw new Error('Python 3 not found');
+  }
+
   return new Promise((resolve, reject) => {
     const scriptPath = path.join(context.extensionPath, SCRIPTS_DIR, MAIN_SCRIPT);
 
-    const args = [
+    const scriptArgs = [
       scriptPath,
       options.scrivPath,
       '--format', options.format,
@@ -225,15 +298,16 @@ async function runImport(
     ];
 
     if (!options.generateIndex) {
-      args.push('--no-index');
+      scriptArgs.push('--no-index');
     }
 
     // V2: Use nested structure by default (unless index depth is 0 with flat flag)
     if (options.indexDepth === 0) {
-      args.push('--flat');
+      scriptArgs.push('--flat');
     }
 
-    const python = spawn('python3', args);
+    const args = getPythonArgs(pythonCmd, scriptArgs);
+    const python = spawn(pythonCmd, args);
 
     let lastResult: ProgressUpdate | null = null;
     let lastPercent = 0;

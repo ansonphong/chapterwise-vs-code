@@ -17,7 +17,7 @@ export function getWriterViewScript(node: CodexNode, initialField: string): stri
     const nodeNameEdit = document.getElementById('nodeNameEdit');
 
     // Toast notification function
-    function showToast(message: string, type = 'info') {
+    function showToast(message, type = 'info') {
       const existing = document.querySelector('.toast');
       if (existing) existing.remove();
 
@@ -34,7 +34,7 @@ export function getWriterViewScript(node: CodexNode, initialField: string): stri
       }, 2700);
     }
 
-    function trapFocus(container: HTMLElement | null) {
+    function trapFocus(container) {
       if (!container) return;
 
       container.addEventListener('keydown', (e) => {
@@ -46,8 +46,8 @@ export function getWriterViewScript(node: CodexNode, initialField: string): stri
 
         if (focusableElements.length === 0) return;
 
-        const firstFocusable = focusableElements[0] as HTMLElement;
-        const lastFocusable = focusableElements[focusableElements.length - 1] as HTMLElement;
+        const firstFocusable = focusableElements[0];
+        const lastFocusable = focusableElements[focusableElements.length - 1];
 
         if (e.shiftKey) {
           if (document.activeElement === firstFocusable) {
@@ -1493,15 +1493,15 @@ export function getWriterViewScript(node: CodexNode, initialField: string): stri
     const duplicateModal = document.getElementById('duplicateModal');
     const duplicateBackdrop = document.getElementById('duplicateBackdrop');
     const duplicatePath = document.getElementById('duplicatePath');
-    const duplicatePreview = document.getElementById('duplicatePreview') as HTMLImageElement | null;
+    const duplicatePreview = document.getElementById('duplicatePreview');
     const duplicateUseExisting = document.getElementById('duplicateUseExisting');
     const duplicateImportAnyway = document.getElementById('duplicateImportAnyway');
     const duplicateCancel = document.getElementById('duplicateCancel');
 
-    let pendingDuplicateFile: string | null = null;
-    let pendingDuplicateExistingPath: string | null = null;
+    let pendingDuplicateFile = null;
+    let pendingDuplicateExistingPath = null;
 
-    function showDuplicateModal(filePath: string, existingPath: string, previewUrl: string) {
+    function showDuplicateModal(filePath, existingPath, previewUrl) {
       if (duplicatePath) duplicatePath.textContent = existingPath;
       if (duplicatePreview) duplicatePreview.src = previewUrl;
       pendingDuplicateFile = filePath;
@@ -1746,7 +1746,7 @@ export function getWriterViewScript(node: CodexNode, initialField: string): stri
 
       // Show images section if it was hidden
       if (imagesEditor) {
-        imagesEditor.style.display = '';
+        imagesEditor.classList.remove('images-empty-hidden');
       }
 
       // Re-initialize drag handlers for new elements
@@ -1821,7 +1821,10 @@ export function getWriterViewScript(node: CodexNode, initialField: string): stri
     // Document-level dragover for drop indicator
     document.addEventListener('dragover', (e) => {
       e.preventDefault();
-      const thumbnail = (e.target as HTMLElement).closest('.image-thumbnail, .gallery-item') as HTMLElement;
+      const target = e.target;
+      const thumbnail = target && typeof target.closest === 'function'
+        ? target.closest('.image-thumbnail, .gallery-item')
+        : null;
 
       // Remove previous indicators
       document.querySelectorAll('.drag-over-left, .drag-over-right').forEach(el => {

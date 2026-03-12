@@ -1134,12 +1134,27 @@ export function getWriterViewStyles(): string {
 
     /* === IMAGES GALLERY === */
 
-    /* Thumbnail grid in overview mode */
+    /* Hide images section when empty (class removed by JS when images are added) */
+    .images-empty-hidden {
+      display: none !important;
+    }
+
+    /* Thumbnail grid in overview mode — dynamic columns (1-4) based on count */
     .images-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 12px;
       padding: 8px 0;
+    }
+    .images-grid:has(> :nth-child(1):last-child) {
+      grid-template-columns: 1fr;
+      max-width: 320px;
+    }
+    .images-grid:has(> :nth-child(2):last-child) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .images-grid:has(> :nth-child(3):last-child) {
+      grid-template-columns: repeat(3, 1fr);
     }
 
     .image-thumbnail {
@@ -1170,7 +1185,7 @@ export function getWriterViewStyles(): string {
 
     .image-thumbnail img {
       width: 100%;
-      height: 120px;
+      aspect-ratio: 1 / 1;
       object-fit: cover;
       display: block;
     }
@@ -1253,7 +1268,7 @@ export function getWriterViewStyles(): string {
       right: 0;
       bottom: 0;
       z-index: 1000;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
     }
@@ -1378,7 +1393,7 @@ export function getWriterViewStyles(): string {
       right: 0;
       bottom: 0;
       z-index: 1002;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
     }
@@ -1503,7 +1518,7 @@ export function getWriterViewStyles(): string {
       right: 0;
       bottom: 0;
       z-index: 1002;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
     }
@@ -1665,7 +1680,7 @@ export function getWriterViewStyles(): string {
       right: 0;
       bottom: 0;
       z-index: 1001;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
     }

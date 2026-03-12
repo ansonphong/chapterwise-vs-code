@@ -254,7 +254,7 @@ export class WordCounter {
             for (const pair of node.items) {
               if (YAML.isScalar(pair.value) && typeof pair.value.value === 'string') {
                 const str = pair.value.value;
-                if (str.includes('\n') || str.length > 80) {
+                if (str.includes('\n') || str.length > 60) {
                   pair.value.type = YAML.Scalar.BLOCK_LITERAL;
                 }
               } else {

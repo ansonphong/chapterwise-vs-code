@@ -5,24 +5,22 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import {
   checkGitInstalled,
   checkGitLFSInstalled,
   isGitRepository,
   runGitCommand,
-  initializeGitRepository,
-  ensureGitIgnore,
-  setupGitLFS,
-  createInitialCommit
+  appendUniqueLines,
 } from '../gitSetup';
-import { getGitIgnoreDescription, getGitAttributesDescription } from './templates';
+import { isPathWithinWorkspace } from '../writerView/utils/helpers';
+import { GITIGNORE_TEMPLATE, GITATTRIBUTES_TEMPLATE, getGitIgnoreDescription, getGitAttributesDescription } from './templates';
 
 /**
  * Wizard step result
  */
 interface WizardStepResult {
   action: 'continue' | 'cancel' | 'back';
-  data?: any;
 }
 
 /**
@@ -107,7 +105,7 @@ async function showWelcomeStep(state: WizardState): Promise<WizardStepResult> {
   // Check requirements
   state.hasGit = await checkGitInstalled();
   state.hasGitLFS = await checkGitLFSInstalled();
-  state.isRepo = isGitRepository(state.workspaceRoot);
+  state.isRepo = await isGitRepository(state.workspaceRoot);
 
   // Build welcome message
   const folderName = path.basename(state.workspaceRoot);
@@ -189,9 +187,9 @@ async function showInitRepoStep(state: WizardState): Promise<WizardStepResult> {
     location: vscode.ProgressLocation.Notification,
     title: 'Initializing Git repository...',
     cancellable: false
-  }, async (progress) => {
-    const result = await runGitCommand('init', state.workspaceRoot);
-    
+  }, async () => {
+    const result = await runGitCommand(['init'], state.workspaceRoot);
+
     if (result.success) {
       state.isRepo = true;
       state.stepsCompleted.init = true;
@@ -200,7 +198,7 @@ async function showInitRepoStep(state: WizardState): Promise<WizardStepResult> {
       );
     } else {
       vscode.window.showErrorMessage(
-        `Failed to initialize repository: ${result.error || 'Unknown error'}`
+        'Failed to initialize repository. Check the "ChapterWise Git" output channel for details.'
       );
     }
   });
@@ -233,7 +231,6 @@ async function showGitIgnoreStep(state: WizardState): Promise<WizardStepResult> 
 
   if (choice === 'Preview First') {
     // Show preview, then ask again
-    const { GITIGNORE_TEMPLATE } = await import('./templates');
     const doc = await vscode.workspace.openTextDocument({
       content: GITIGNORE_TEMPLATE,
       language: 'gitignore'
@@ -256,27 +253,37 @@ async function showGitIgnoreStep(state: WizardState): Promise<WizardStepResult> 
     }
   }
 
-  // Create .gitignore (using the standalone function)
+  // Create or update .gitignore (merge if it already exists)
   await vscode.window.withProgress({
     location: vscode.ProgressLocation.Notification,
     title: 'Creating .gitignore...',
     cancellable: false
-  }, async (progress) => {
+  }, async () => {
     try {
-      // Import and use the ensureGitIgnore function's logic
-      const fs = require('fs');
-      const { GITIGNORE_TEMPLATE } = await import('./templates');
       const gitignorePath = path.join(state.workspaceRoot, '.gitignore');
-      
-      fs.writeFileSync(gitignorePath, GITIGNORE_TEMPLATE, 'utf-8');
+
+      if (!isPathWithinWorkspace(gitignorePath, state.workspaceRoot)) {
+        vscode.window.showErrorMessage('Invalid .gitignore path.');
+        return;
+      }
+
+      let content: string;
+      try {
+        const existing = await fs.promises.readFile(gitignorePath, 'utf-8');
+        content = appendUniqueLines(existing, '\n' + GITIGNORE_TEMPLATE);
+      } catch {
+        content = GITIGNORE_TEMPLATE;
+      }
+
+      await fs.promises.writeFile(gitignorePath, content, 'utf-8');
       state.stepsCompleted.gitignore = true;
-      
+
       vscode.window.showInformationMessage(
         `✅ .gitignore created with ${description}`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       vscode.window.showErrorMessage(
-        `Failed to create .gitignore: ${error.message || 'Unknown error'}`
+        'Failed to create .gitignore. Check the "ChapterWise Git" output channel for details.'
       );
     }
   });
@@ -308,7 +315,6 @@ async function showGitLFSStep(state: WizardState): Promise<WizardStepResult> {
   }
 
   if (choice === 'Preview First') {
-    const { GITATTRIBUTES_TEMPLATE } = await import('./templates');
     const doc = await vscode.workspace.openTextDocument({
       content: GITATTRIBUTES_TEMPLATE,
       language: 'gitattributes'
@@ -340,29 +346,40 @@ async function showGitLFSStep(state: WizardState): Promise<WizardStepResult> {
     try {
       // Install LFS hooks
       progress.report({ message: 'Installing Git LFS hooks...', increment: 33 });
-      const installResult = await runGitCommand('lfs install', state.workspaceRoot);
-      
+      const installResult = await runGitCommand(['lfs', 'install'], state.workspaceRoot);
+
       if (!installResult.success) {
         throw new Error(installResult.error || 'Failed to install Git LFS');
       }
 
-      // Create .gitattributes
+      // Create or update .gitattributes (merge if it already exists)
       progress.report({ message: 'Configuring file tracking...', increment: 34 });
-      const fs = require('fs');
-      const { GITATTRIBUTES_TEMPLATE } = await import('./templates');
       const gitattributesPath = path.join(state.workspaceRoot, '.gitattributes');
-      
-      fs.writeFileSync(gitattributesPath, GITATTRIBUTES_TEMPLATE, 'utf-8');
+
+      if (!isPathWithinWorkspace(gitattributesPath, state.workspaceRoot)) {
+        vscode.window.showErrorMessage('Invalid .gitattributes path.');
+        return;
+      }
+
+      let content: string;
+      try {
+        const existing = await fs.promises.readFile(gitattributesPath, 'utf-8');
+        content = appendUniqueLines(existing, '\n' + GITATTRIBUTES_TEMPLATE);
+      } catch {
+        content = GITATTRIBUTES_TEMPLATE;
+      }
+
+      await fs.promises.writeFile(gitattributesPath, content, 'utf-8');
       state.stepsCompleted.lfs = true;
-      
+
       progress.report({ message: 'Complete!', increment: 33 });
-      
+
       vscode.window.showInformationMessage(
         `✅ Git LFS setup complete! Now tracking ${description}`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       vscode.window.showErrorMessage(
-        `Failed to setup Git LFS: ${error.message || 'Unknown error'}`
+        'Failed to setup Git LFS. Check the "ChapterWise Git" output channel for details.'
       );
     }
   });
@@ -404,8 +421,8 @@ async function showInitialCommitStep(state: WizardState): Promise<WizardStepResu
     try {
       // Stage all files
       progress.report({ message: 'Staging files...', increment: 50 });
-      const addResult = await runGitCommand('add .', state.workspaceRoot);
-      
+      const addResult = await runGitCommand(['add', '.'], state.workspaceRoot);
+
       if (!addResult.success) {
         throw new Error(addResult.error || 'Failed to stage files');
       }
@@ -413,10 +430,10 @@ async function showInitialCommitStep(state: WizardState): Promise<WizardStepResu
       // Create commit
       progress.report({ message: 'Creating commit...', increment: 50 });
       const commitResult = await runGitCommand(
-        'commit -m "Initial commit - ChapterWise project setup"',
+        ['commit', '-m', 'Initial commit - ChapterWise project setup'],
         state.workspaceRoot
       );
-      
+
       if (!commitResult.success) {
         // Check if there's nothing to commit
         if (commitResult.error?.includes('nothing to commit')) {
@@ -427,14 +444,14 @@ async function showInitialCommitStep(state: WizardState): Promise<WizardStepResu
       }
 
       state.stepsCompleted.commit = true;
-      
+
       vscode.window.showInformationMessage(
         '✅ Initial commit created successfully!'
       );
-      
-    } catch (error: any) {
+
+    } catch (error: unknown) {
       vscode.window.showErrorMessage(
-        `Failed to create commit: ${error.message || 'Unknown error'}`
+        'Failed to create commit. Check the "ChapterWise Git" output channel for details.'
       );
     }
   });

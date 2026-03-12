@@ -10,7 +10,8 @@ export function getToolbarScript(node: CodexNode, initialField: string): string 
   const nodeData = {
     availableFields: node.availableFields,
     hasAttributes: node.hasAttributes || (node.attributes && node.attributes.length > 0),
-    hasContentSections: node.hasContentSections || (node.contentSections && node.contentSections.length > 0)
+    hasContentSections: node.hasContentSections || (node.contentSections && node.contentSections.length > 0),
+    hasImages: node.hasImages || (node.images && node.images.length > 0)
   };
   
   return /* javascript */ `
@@ -86,8 +87,8 @@ export function getToolbarScript(node: CodexNode, initialField: string): string 
       // Add Content Sections option if it doesn't exist
       if (!hasContentSections) {
         options.push(\`
-          <button class="toolbar-dropdown-item" 
-                  data-field-type="content" 
+          <button class="toolbar-dropdown-item"
+                  data-field-type="content"
                   role="menuitem"
                   tabindex="0">
             <span class="dropdown-item-icon">📝</span>
@@ -95,7 +96,21 @@ export function getToolbarScript(node: CodexNode, initialField: string): string 
           </button>
         \`);
       }
-      
+
+      // Add Images option if node has no images yet
+      const hasImages = nodeData.hasImages;
+      if (!hasImages) {
+        options.push(\`
+          <button class="toolbar-dropdown-item"
+                  data-field-type="images"
+                  role="menuitem"
+                  tabindex="0">
+            <span class="dropdown-item-icon">🖼</span>
+            <span class="dropdown-item-label">Images</span>
+          </button>
+        \`);
+      }
+
       if (options.length === 0) {
         return '<div class="toolbar-dropdown-empty">All fields exist</div>';
       }
@@ -356,6 +371,19 @@ export function getToolbarScript(node: CodexNode, initialField: string): string 
      * Handle adding a new field
      */
     function handleAddField(fieldType) {
+      if (fieldType === 'images') {
+        // Show the images section and trigger add image
+        const imagesEditor = document.getElementById('imagesEditor');
+        if (imagesEditor) {
+          imagesEditor.classList.remove('images-empty-hidden');
+        }
+        // Mark images as existing in nodeData so the option disappears
+        nodeData.hasImages = true;
+        // Trigger the add image button
+        const addImageBtn = document.getElementById('addImageBtn');
+        if (addImageBtn) addImageBtn.click();
+        return;
+      }
       // Send message to extension to add the field
       vscode.postMessage({
         type: 'addField',

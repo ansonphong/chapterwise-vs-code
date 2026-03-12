@@ -15,6 +15,11 @@ import * as YAML from 'yaml';
 import { isCodexFile, generateUuid } from './codexModel';
 
 /**
+ * Threshold for using YAML block scalar style (consistent with codexModel.ts)
+ */
+const BLOCK_SCALAR_THRESHOLD = 60;
+
+/**
  * Codex Lite field mappings
  * These fields map directly between codex root and markdown frontmatter
  */
@@ -160,7 +165,7 @@ export class CodexMarkdownConverter {
     
     const codex: Record<string, unknown> = {
       metadata: {
-        formatVersion: '1.0',
+        formatVersion: '1.1',
         documentVersion: '1.0.0',
         created: new Date().toISOString(),
         source: 'markdown-lite',
@@ -245,23 +250,35 @@ export class CodexMarkdownConverter {
 
   /**
    * Extract YAML frontmatter from markdown content
+   * Uses indexOf to properly handle '---' that may appear in body content
    */
   private extractFrontmatter(content: string): { frontmatter: Record<string, unknown>; body: string } {
     let frontmatter: Record<string, unknown> = {};
     let body = content;
 
-    if (content.startsWith('---')) {
-      const parts = content.split('---');
-      if (parts.length >= 3) {
-        const fmText = parts[1].trim();
-        body = parts.slice(2).join('---').trim();
+    // Check for frontmatter delimiter at start of file
+    if (!content.startsWith('---')) {
+      return { frontmatter, body };
+    }
 
-        try {
-          frontmatter = YAML.parse(fmText) || {};
-        } catch (e) {
-          console.warn('Failed to parse frontmatter:', e);
-        }
-      }
+    // Find the end of frontmatter (next --- after the opening one)
+    const afterFirst = content.slice(3);
+    const endIndex = afterFirst.indexOf('\n---');
+
+    if (endIndex === -1) {
+      // No closing delimiter found
+      return { frontmatter, body };
+    }
+
+    const fmText = afterFirst.slice(0, endIndex).trim();
+    body = afterFirst.slice(endIndex + 4).trim(); // +4 to skip '\n---'
+
+    try {
+      frontmatter = YAML.parse(fmText) || {};
+    } catch (e) {
+      console.warn('Failed to parse frontmatter:', e);
+      // Return original content if parsing fails
+      return { frontmatter: {}, body: content };
     }
 
     return { frontmatter, body };
@@ -503,7 +520,7 @@ export async function runConvertToCodex(): Promise<void> {
           for (const pair of node.items) {
             if (YAML.isScalar(pair.value) && typeof pair.value.value === 'string') {
               const str = pair.value.value;
-              if (str.includes('\n') || str.length > 80) {
+              if (str.includes('\n') || str.length > BLOCK_SCALAR_THRESHOLD) {
                 pair.value.type = YAML.Scalar.BLOCK_LITERAL;
               }
             } else {

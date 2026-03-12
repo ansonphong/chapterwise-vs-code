@@ -6,11 +6,31 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { GITIGNORE_TEMPLATE, GITATTRIBUTES_TEMPLATE, getGitIgnoreDescription, getGitAttributesDescription } from './gitSetup/templates';
+import { isPathWithinWorkspace } from './writerView/utils/helpers';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+const GIT_COMMAND_TIMEOUT = 30_000;
+
+const outputChannel = vscode.window.createOutputChannel('ChapterWise Git');
+
+/**
+ * Shell metacharacters that must not appear in git arguments
+ */
+const SHELL_METACHAR_RE = /[;|&$`()<>{}!\n\r]/;
+
+/**
+ * Sanitize an error into a safe, user-facing message.
+ * Full details are logged to the output channel.
+ */
+function sanitizeGitError(error: unknown, context: string): string {
+  const message = error instanceof Error ? error.message : String(error);
+  outputChannel.appendLine(`[${new Date().toISOString()}] ${context}: ${message}`);
+  return `${context}. Check the "ChapterWise Git" output channel for details.`;
+}
 
 /**
  * Result of a Git command execution
@@ -26,7 +46,7 @@ export interface GitCommandResult {
  */
 export async function checkGitInstalled(): Promise<boolean> {
   try {
-    const result = await runGitCommand('--version', process.cwd());
+    const result = await runGitCommand(['--version'], process.cwd());
     return result.success && result.output.includes('git version');
   } catch (error) {
     return false;
@@ -38,7 +58,7 @@ export async function checkGitInstalled(): Promise<boolean> {
  */
 export async function checkGitLFSInstalled(): Promise<boolean> {
   try {
-    const result = await runGitCommand('lfs version', process.cwd());
+    const result = await runGitCommand(['lfs', 'version'], process.cwd());
     return result.success && result.output.toLowerCase().includes('git-lfs');
   } catch (error) {
     return false;
@@ -46,21 +66,48 @@ export async function checkGitLFSInstalled(): Promise<boolean> {
 }
 
 /**
- * Run a Git command in the specified directory
+ * Run a Git command in the specified directory.
+ * Uses execFile (no shell) with argument array to prevent command injection.
  */
-export async function runGitCommand(command: string, cwd: string): Promise<GitCommandResult> {
+export async function runGitCommand(args: string[], cwd: string): Promise<GitCommandResult> {
+  // Validate cwd against workspace boundary when a workspace is open
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (workspaceRoot && !isPathWithinWorkspace(cwd, workspaceRoot)) {
+    const sanitized = sanitizeGitError(
+      new Error(`cwd "${cwd}" is outside workspace "${workspaceRoot}"`),
+      'Git command rejected — working directory outside workspace'
+    );
+    return { success: false, output: '', error: sanitized };
+  }
+
+  // Validate each argument against shell metacharacters (defense-in-depth)
+  for (const arg of args) {
+    if (SHELL_METACHAR_RE.test(arg)) {
+      const sanitized = sanitizeGitError(
+        new Error(`Rejected argument containing shell metacharacter: ${arg}`),
+        'Git command validation failed'
+      );
+      return { success: false, output: '', error: sanitized };
+    }
+  }
+
   try {
-    const { stdout, stderr } = await execAsync(`git ${command}`, { cwd });
+    const { stdout, stderr } = await execFileAsync('git', args, {
+      cwd,
+      timeout: GIT_COMMAND_TIMEOUT,
+    });
     return {
       success: true,
       output: stdout.trim(),
       error: stderr.trim() || undefined
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    outputChannel.appendLine(`[${new Date().toISOString()}] git ${args.join(' ')} failed: ${message}`);
     return {
       success: false,
       output: '',
-      error: error.message || 'Unknown error'
+      error: message
     };
   }
 }
@@ -68,9 +115,14 @@ export async function runGitCommand(command: string, cwd: string): Promise<GitCo
 /**
  * Check if a directory is already a Git repository
  */
-export function isGitRepository(workspaceRoot: string): boolean {
+export async function isGitRepository(workspaceRoot: string): Promise<boolean> {
   const gitDir = path.join(workspaceRoot, '.git');
-  return fs.existsSync(gitDir);
+  try {
+    await fs.promises.access(gitDir);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -99,8 +151,8 @@ export async function initializeGitRepository(): Promise<void> {
   }
 
   // Check if already a Git repo
-  if (isGitRepository(workspaceRoot)) {
-    const choice = await vscode.window.showInformationMessage(
+  if (await isGitRepository(workspaceRoot)) {
+    await vscode.window.showInformationMessage(
       'This folder is already a Git repository.',
       'OK'
     );
@@ -123,16 +175,16 @@ export async function initializeGitRepository(): Promise<void> {
     location: vscode.ProgressLocation.Notification,
     title: 'Initializing Git repository...',
     cancellable: false
-  }, async (progress) => {
-    const result = await runGitCommand('init', workspaceRoot);
-    
+  }, async () => {
+    const result = await runGitCommand(['init'], workspaceRoot);
+
     if (result.success) {
       vscode.window.showInformationMessage(
         `✅ Git repository initialized successfully in ${path.basename(workspaceRoot)}`
       );
     } else {
       vscode.window.showErrorMessage(
-        `Failed to initialize Git repository: ${result.error || 'Unknown error'}`
+        sanitizeGitError(result.error, 'Failed to initialize Git repository')
       );
     }
   });
@@ -141,41 +193,70 @@ export async function initializeGitRepository(): Promise<void> {
 /**
  * Read file content or return empty string if file doesn't exist
  */
-function readFileOrEmpty(filePath: string): string {
+async function readFileOrEmpty(filePath: string): Promise<string> {
   try {
-    return fs.readFileSync(filePath, 'utf-8');
-  } catch (error) {
+    return await fs.promises.readFile(filePath, 'utf-8');
+  } catch {
     return '';
   }
 }
 
 /**
- * Append unique lines to content (only add if they don't already exist)
+ * Parse lines into sections: each section is a group of comment/blank header
+ * lines followed by pattern lines, ending at the next comment or EOF.
  */
-function appendUniqueLines(existingContent: string, newLines: string): string {
-  const existing = existingContent.split('\n');
-  const toAdd = newLines.split('\n');
-  
-  const result = [...existing];
-  
-  for (const line of toAdd) {
+function parseSections(lines: string[]): Array<{ headers: string[]; patterns: string[] }> {
+  const sections: Array<{ headers: string[]; patterns: string[] }> = [];
+  let currentHeaders: string[] = [];
+  let currentPatterns: string[] = [];
+
+  for (const line of lines) {
     const trimmed = line.trim();
-    // Skip empty lines and comments when checking for duplicates
     if (trimmed === '' || trimmed.startsWith('#')) {
-      result.push(line);
-      continue;
-    }
-    
-    // Check if this pattern already exists
-    const alreadyExists = existing.some(existingLine => 
-      existingLine.trim() === trimmed
-    );
-    
-    if (!alreadyExists) {
-      result.push(line);
+      // If we have accumulated patterns, flush the current section
+      if (currentPatterns.length > 0) {
+        sections.push({ headers: currentHeaders, patterns: currentPatterns });
+        currentHeaders = [];
+        currentPatterns = [];
+      }
+      currentHeaders.push(line);
+    } else {
+      currentPatterns.push(line);
     }
   }
-  
+
+  // Flush final section
+  if (currentHeaders.length > 0 || currentPatterns.length > 0) {
+    sections.push({ headers: currentHeaders, patterns: currentPatterns });
+  }
+
+  return sections;
+}
+
+/**
+ * Append unique lines to content (only add if they don't already exist).
+ * Processes template in section chunks so comment headers are only added
+ * when at least one pattern from the section is new.
+ */
+export function appendUniqueLines(existingContent: string, newLines: string): string {
+  const existingLines = existingContent.split('\n');
+  const existingSet = new Set(existingLines.map(l => l.trim()));
+
+  const sections = parseSections(newLines.split('\n'));
+  const result = [...existingLines];
+
+  for (const section of sections) {
+    // Determine which patterns are actually new
+    const newPatterns = section.patterns.filter(p => !existingSet.has(p.trim()));
+
+    if (newPatterns.length > 0) {
+      // Add headers + only the new patterns
+      result.push(...section.headers);
+      result.push(...newPatterns);
+    }
+    // If no new patterns, skip the entire section (headers + patterns)
+  }
+
   return result.join('\n');
 }
 
@@ -191,12 +272,24 @@ export async function ensureGitIgnore(): Promise<void> {
 
   const workspaceRoot = workspaceFolder.uri.fsPath;
   const gitignorePath = path.join(workspaceRoot, '.gitignore');
-  const exists = fs.existsSync(gitignorePath);
+
+  if (!isPathWithinWorkspace(gitignorePath, workspaceRoot)) {
+    vscode.window.showErrorMessage('Invalid .gitignore path.');
+    return;
+  }
+
+  let exists: boolean;
+  try {
+    await fs.promises.access(gitignorePath);
+    exists = true;
+  } catch {
+    exists = false;
+  }
 
   // Show preview of what will be added
   const action = exists ? 'update' : 'create';
   const description = getGitIgnoreDescription();
-  
+
   const confirm = await vscode.window.showInformationMessage(
     exists
       ? `Update .gitignore with writing project patterns?\n\n${description}\n\nExisting patterns will be preserved.`
@@ -217,14 +310,14 @@ export async function ensureGitIgnore(): Promise<void> {
       language: 'gitignore'
     });
     await vscode.window.showTextDocument(doc, { preview: true });
-    
+
     // Ask again after preview
     const confirmAfterPreview = await vscode.window.showInformationMessage(
       `${action === 'create' ? 'Create' : 'Update'} .gitignore with these patterns?`,
       action === 'create' ? 'Create' : 'Update',
       'Cancel'
     );
-    
+
     if (confirmAfterPreview !== (action === 'create' ? 'Create' : 'Update')) {
       return;
     }
@@ -235,32 +328,32 @@ export async function ensureGitIgnore(): Promise<void> {
     location: vscode.ProgressLocation.Notification,
     title: `${action === 'create' ? 'Creating' : 'Updating'} .gitignore...`,
     cancellable: false
-  }, async (progress) => {
+  }, async () => {
     try {
       let content: string;
-      
+
       if (exists) {
-        // Update existing file
-        const existingContent = readFileOrEmpty(gitignorePath);
+        // Update existing file — merge, preserving existing patterns
+        const existingContent = await readFileOrEmpty(gitignorePath);
         content = appendUniqueLines(existingContent, '\n' + GITIGNORE_TEMPLATE);
       } else {
         // Create new file
         content = GITIGNORE_TEMPLATE;
       }
-      
-      fs.writeFileSync(gitignorePath, content, 'utf-8');
-      
+
+      await fs.promises.writeFile(gitignorePath, content, 'utf-8');
+
       vscode.window.showInformationMessage(
         `✅ .gitignore ${action === 'create' ? 'created' : 'updated'} successfully with ${description}`
       );
-      
+
       // Open the file
       const doc = await vscode.workspace.openTextDocument(gitignorePath);
       await vscode.window.showTextDocument(doc);
-      
-    } catch (error: any) {
+
+    } catch (error: unknown) {
       vscode.window.showErrorMessage(
-        `Failed to ${action} .gitignore: ${error.message || 'Unknown error'}`
+        sanitizeGitError(error, `Failed to ${action} .gitignore`)
       );
     }
   });
@@ -292,11 +385,23 @@ export async function setupGitLFS(): Promise<void> {
   }
 
   const gitattributesPath = path.join(workspaceRoot, '.gitattributes');
-  const exists = fs.existsSync(gitattributesPath);
+
+  if (!isPathWithinWorkspace(gitattributesPath, workspaceRoot)) {
+    vscode.window.showErrorMessage('Invalid .gitattributes path.');
+    return;
+  }
+
+  let exists: boolean;
+  try {
+    await fs.promises.access(gitattributesPath);
+    exists = true;
+  } catch {
+    exists = false;
+  }
 
   // Show what LFS will track
   const description = getGitAttributesDescription();
-  
+
   const confirm = await vscode.window.showInformationMessage(
     exists
       ? `Setup Git LFS for large files?\n\n${description}\n\nExisting attributes will be preserved.`
@@ -317,14 +422,14 @@ export async function setupGitLFS(): Promise<void> {
       language: 'gitattributes'
     });
     await vscode.window.showTextDocument(doc, { preview: true });
-    
+
     // Ask again
     const confirmAfterPreview = await vscode.window.showInformationMessage(
       'Setup Git LFS with these file types?',
       'Setup LFS',
       'Cancel'
     );
-    
+
     if (confirmAfterPreview !== 'Setup LFS') {
       return;
     }
@@ -339,38 +444,38 @@ export async function setupGitLFS(): Promise<void> {
     try {
       // Install Git LFS for the user
       progress.report({ message: 'Installing Git LFS hooks...', increment: 25 });
-      const installResult = await runGitCommand('lfs install', workspaceRoot);
-      
+      const installResult = await runGitCommand(['lfs', 'install'], workspaceRoot);
+
       if (!installResult.success) {
         throw new Error(installResult.error || 'Failed to install Git LFS');
       }
 
       // Create or update .gitattributes
       progress.report({ message: 'Configuring file tracking...', increment: 50 });
-      
+
       let content: string;
       if (exists) {
-        const existingContent = readFileOrEmpty(gitattributesPath);
+        const existingContent = await readFileOrEmpty(gitattributesPath);
         content = appendUniqueLines(existingContent, '\n' + GITATTRIBUTES_TEMPLATE);
       } else {
         content = GITATTRIBUTES_TEMPLATE;
       }
-      
-      fs.writeFileSync(gitattributesPath, content, 'utf-8');
-      
+
+      await fs.promises.writeFile(gitattributesPath, content, 'utf-8');
+
       progress.report({ message: 'Complete!', increment: 25 });
-      
+
       vscode.window.showInformationMessage(
         `✅ Git LFS setup complete!\n\nNow tracking ${description}`
       );
-      
+
       // Open the file
       const doc = await vscode.workspace.openTextDocument(gitattributesPath);
       await vscode.window.showTextDocument(doc);
-      
-    } catch (error: any) {
+
+    } catch (error: unknown) {
       vscode.window.showErrorMessage(
-        `Failed to setup Git LFS: ${error.message || 'Unknown error'}`
+        sanitizeGitError(error, 'Failed to setup Git LFS')
       );
     }
   });
@@ -388,7 +493,7 @@ export async function createInitialCommit(): Promise<void> {
 
   const workspaceRoot = workspaceFolder.uri.fsPath;
 
-  if (!isGitRepository(workspaceRoot)) {
+  if (!await isGitRepository(workspaceRoot)) {
     vscode.window.showErrorMessage('Not a Git repository. Initialize Git first.');
     return;
   }
@@ -411,8 +516,8 @@ export async function createInitialCommit(): Promise<void> {
     try {
       // Stage all files
       progress.report({ message: 'Staging files...', increment: 33 });
-      const addResult = await runGitCommand('add .', workspaceRoot);
-      
+      const addResult = await runGitCommand(['add', '.'], workspaceRoot);
+
       if (!addResult.success) {
         throw new Error(addResult.error || 'Failed to stage files');
       }
@@ -420,10 +525,10 @@ export async function createInitialCommit(): Promise<void> {
       // Create commit
       progress.report({ message: 'Creating commit...', increment: 34 });
       const commitResult = await runGitCommand(
-        'commit -m "Initial commit - ChapterWise project setup"',
+        ['commit', '-m', 'Initial commit - ChapterWise project setup'],
         workspaceRoot
       );
-      
+
       if (!commitResult.success) {
         // Check if there's nothing to commit
         if (commitResult.error?.includes('nothing to commit')) {
@@ -434,14 +539,14 @@ export async function createInitialCommit(): Promise<void> {
       }
 
       progress.report({ message: 'Complete!', increment: 33 });
-      
+
       vscode.window.showInformationMessage(
         '✅ Initial commit created successfully!\n\nYour project is now version-controlled.'
       );
-      
-    } catch (error: any) {
+
+    } catch (error: unknown) {
       vscode.window.showErrorMessage(
-        `Failed to create commit: ${error.message || 'Unknown error'}`
+        sanitizeGitError(error, 'Failed to create commit')
       );
     }
   });
@@ -451,6 +556,6 @@ export async function createInitialCommit(): Promise<void> {
  * Dispose of any resources
  */
 export function disposeGitSetup(): void {
-  // No resources to clean up currently
+  outputChannel.dispose();
 }
 

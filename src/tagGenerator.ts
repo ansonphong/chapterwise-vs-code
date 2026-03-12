@@ -173,24 +173,28 @@ export class TagGenerator {
       text = text.replace(/<[^>]+>/g, ' ');
       text = text.replace(/\s+/g, ' ').trim();
 
-      // Tokenization pattern (extended Latin letters, allow hyphen/apostrophe inside)
-      const tokenPattern = /[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'\-]+/g;
+      // Tokenization pattern (Unicode letters with hyphen/apostrophe inside)
+      // Uses Unicode property escapes to support all scripts (Latin, CJK, Cyrillic, Arabic, etc.)
+      const tokenPattern = /\p{L}[\p{L}'\-]*/gu;
+
+      // Validation pattern for token content (must contain at least one Unicode letter)
+      const hasLetterPattern = /\p{L}/u;
 
       // Extract main body tokens
       const bodyTokensRaw = text.match(tokenPattern) || [];
       let bodyTokens = bodyTokensRaw
-        .filter(t => t.length >= 3)
+        .filter(t => t.length >= 2) // Lowered to 2 for CJK (single CJK char can be meaningful)
         .map(t => this.normalizeToken(t))
-        .filter(t => /[a-zA-ZÀ-ÖØ-öø-ÿ]/.test(t) && !STOPWORDS.has(t));
+        .filter(t => hasLetterPattern.test(t) && !STOPWORDS.has(t));
 
       // Extract heading tokens for boosting
       let headingTokens: string[] = [];
       if (headingBoostText) {
         const headingTokensRaw = headingBoostText.match(tokenPattern) || [];
         headingTokens = headingTokensRaw
-          .filter(t => t.length >= 3)
+          .filter(t => t.length >= 2)
           .map(t => this.normalizeToken(t))
-          .filter(t => /[a-zA-ZÀ-ÖØ-öø-ÿ]/.test(t) && !STOPWORDS.has(t));
+          .filter(t => hasLetterPattern.test(t) && !STOPWORDS.has(t));
       }
 
       // Unigram counts with heading boost
@@ -393,7 +397,7 @@ export class TagGenerator {
           for (const pair of node.items) {
             if (YAML.isScalar(pair.value) && typeof pair.value.value === 'string') {
               const str = pair.value.value;
-              if (str.includes('\n') || str.length > 80) {
+              if (str.includes('\n') || str.length > 60) {
                 pair.value.type = YAML.Scalar.BLOCK_LITERAL;
               }
             } else {

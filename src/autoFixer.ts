@@ -960,7 +960,7 @@ export class CodexAutoFixer {
             if (timePattern.test(str)) {
               // Force double quotes for time patterns to prevent sexagesimal parsing
               pair.value.type = YAML.Scalar.QUOTE_DOUBLE;
-            } else if (str.includes('\n') || str.length > 80) {
+            } else if (str.includes('\n') || str.length > 60) {
               // Use block literal (|) for multiline or long strings
               pair.value.type = YAML.Scalar.BLOCK_LITERAL;
             }

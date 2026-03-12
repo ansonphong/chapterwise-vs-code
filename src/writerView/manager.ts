@@ -63,9 +63,18 @@ export class WriterViewManager {
   }
 
   /**
-   * Get workspace root path
+   * Get workspace root path — prefer the tree provider's context root
+   * (which tracks the user's active Codex project) over workspaceFolders[0]
    */
   private getWorkspaceRoot(): string {
+    // Use tree provider's context root first (matches the active Codex project)
+    if (this.treeProvider) {
+      const contextRoot = this.treeProvider.getWorkspaceRoot();
+      if (contextRoot) {
+        return contextRoot;
+      }
+    }
+    // Fallback to VS Code workspace folder
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (workspaceFolders && workspaceFolders.length > 0) {
       return workspaceFolders[0].uri.fsPath;
@@ -198,11 +207,14 @@ export class WriterViewManager {
     const resolved = path.resolve(fullPath);
     const resolvedRoot = path.resolve(workspaceRoot);
     if (!resolved.startsWith(resolvedRoot + path.sep) && resolved !== resolvedRoot) {
+      console.log(`[ChapterWise] resolveImageUrl: path traversal blocked. url=${url}, resolved=${resolved}, root=${resolvedRoot}`);
       return '';
     }
 
     const fileUri = vscode.Uri.file(fullPath);
-    return webview.asWebviewUri(fileUri).toString();
+    const webviewUri = webview.asWebviewUri(fileUri).toString();
+    console.log(`[ChapterWise] resolveImageUrl: url=${url} -> ${webviewUri}`);
+    return webviewUri;
   }
 
   /**
@@ -1777,6 +1789,7 @@ export class WriterViewManager {
 
       // Resolve preview URL for webview
       const previewUrl = this.resolveImageUrlForWebview(panel.webview, existingPath, workspaceRoot);
+      console.log(`[ChapterWise] Duplicate preview: existingPath=${existingPath}, workspaceRoot=${workspaceRoot}, previewUrl=${previewUrl}`);
 
       // Send message to show modal
       safePostMessage(panel, {

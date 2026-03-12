@@ -461,8 +461,8 @@ async function mergePerFolderIndexes(
         const indexData = JSON.parse(indexContent);
 
         if (indexData.children && Array.isArray(indexData.children)) {
-          // Merge order values from per-folder index
-          applyPerFolderOrders(folder.children, indexData.children);
+          // Reorder children to match per-folder index array position
+          applyYamlOrder(folder.children, indexData.children);
         }
       } catch (error) {
         log(`Failed to read per-folder index at ${folderPath}: ${error}`);
@@ -478,7 +478,7 @@ async function mergePerFolderIndexes(
       const indexData = YAML.parse(indexContent);
 
       if (indexData.children && Array.isArray(indexData.children)) {
-        applyPerFolderOrders(rootChildren, indexData.children);
+        applyYamlOrder(rootChildren, indexData.children);
       }
     } catch (error) {
       log(`Failed to read root index.codex.yaml: ${error}`);
@@ -487,34 +487,30 @@ async function mergePerFolderIndexes(
 }
 
 /**
- * Apply order values from per-folder index to generated children
+ * Reorder generated children to match the order defined in an index (YAML or JSON).
+ * Items found in the index come first (in index order), followed by any unmatched items.
  */
-function applyPerFolderOrders(
+function applyYamlOrder(
   generatedChildren: any[],
   indexChildren: any[]
 ): void {
-  // Build lookup map by _filename or name
-  const indexMap = new Map<string, any>();
-
-  for (const child of indexChildren) {
-    const key = child._filename || child.name;
+  // Build lookup map: name → index position
+  const orderMap = new Map<string, number>();
+  for (let i = 0; i < indexChildren.length; i++) {
+    const key = indexChildren[i]._filename || indexChildren[i].name;
     if (key) {
-      indexMap.set(key, child);
+      orderMap.set(key, i);
     }
   }
 
-  // Apply order values to matching children
-  for (const child of generatedChildren) {
-    const key = child._filename || child.name;
-    const indexEntry = indexMap.get(key);
-
-    if (indexEntry && indexEntry.order !== undefined) {
-      child.order = indexEntry.order;
-    } else if (child.order === undefined) {
-      // Assign default order if not set
-      child.order = indexChildren.length || 999;
-      }
-  }
+  // Stable sort: items in index come first (by index position), then unmatched items preserve original order
+  generatedChildren.sort((a, b) => {
+    const keyA = a._filename || a.name;
+    const keyB = b._filename || b.name;
+    const posA = orderMap.has(keyA) ? orderMap.get(keyA)! : Number.MAX_SAFE_INTEGER;
+    const posB = orderMap.has(keyB) ? orderMap.get(keyB)! : Number.MAX_SAFE_INTEGER;
+    return posA - posB;
+  });
 }
 
 // ============================================================================
@@ -1032,29 +1028,11 @@ function applyTypeStyles(children: any[], typeStyles: any[]): void {
           }
 
 /**
- * Sort children recursively by order then name.
- * V2: Only sorts if explicit `order` fields are present.
- * This preserves array order for imports (Scrivener, etc.) that rely on position.
+ * No-op: array position in index.codex.yaml is the source of truth for ordering.
+ * Ordering is applied by applyYamlOrder() during mergePerFolderIndexes().
  */
-function sortChildrenRecursive(children: any[]): void {
-  // Only sort if at least one child has an explicit `order` field
-  const hasExplicitOrder = children.some(c => c.order !== undefined);
-
-  if (hasExplicitOrder) {
-    children.sort((a, b) => {
-      const orderA = a.order ?? 999;
-      const orderB = b.order ?? 999;
-      if (orderA !== orderB) {return orderA - orderB;}
-      return (a.name || '').localeCompare(b.name || '');
-    });
-  }
-  // No order fields = preserve array order as-is (important for Scrivener imports)
-
-  for (const child of children) {
-    if (child.children) {
-      sortChildrenRecursive(child.children);
-    }
-  }
+function sortChildrenRecursive(_children: any[]): void {
+  // No-op — ordering is now handled by applyYamlOrder() in mergePerFolderIndexes
 }
 
   /**
@@ -1231,7 +1209,6 @@ export async function generatePerFolderIndex(
         type: 'folder',
         name: entry.name,
         _computed_path: folderPath ? path.join(folderPath, entry.name) : entry.name,
-        order: 999,
         children: [] // Initialize empty children array
       };
 

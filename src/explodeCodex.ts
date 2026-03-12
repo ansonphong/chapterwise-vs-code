@@ -71,6 +71,11 @@ export class CodexExploder {
         throw new Error(`Input file not found: ${inputPath}`);
       }
 
+      // === SECURITY: Reject symlinks to prevent path escape attacks ===
+      if (fs.lstatSync(inputPath).isSymbolicLink()) {
+        throw new Error(`Symlinks not allowed: ${inputPath}`);
+      }
+
       const fileContent = fs.readFileSync(inputPath, 'utf-8');
       const isJson = inputPath.toLowerCase().endsWith('.json');
 
@@ -139,6 +144,12 @@ export class CodexExploder {
             options.format
           );
 
+          // === SECURITY: Reject symlinks at output path ===
+          if (fs.existsSync(outputPath) && fs.lstatSync(outputPath).isSymbolicLink()) {
+            this.errors.push(`Output path is a symlink, skipping: ${outputPath}`);
+            continue;
+          }
+
           // Check if file exists
           if (fs.existsSync(outputPath) && !options.force && !options.dryRun) {
             this.errors.push(`File already exists: ${outputPath} (use force option to overwrite)`);
@@ -157,11 +168,9 @@ export class CodexExploder {
               inputPath
             );
 
-            // Create directory if needed
+            // Create directory if needed (recursive: true is safe if already exists)
             const outputDir = path.dirname(outputPath);
-            if (!fs.existsSync(outputDir)) {
-              fs.mkdirSync(outputDir, { recursive: true });
-            }
+            fs.mkdirSync(outputDir, { recursive: true });
 
             // Write file
             this.writeCodexFile(outputPath, extractedCodex, options.format);
@@ -282,21 +291,34 @@ export class CodexExploder {
     parentMetadata: Record<string, unknown>,
     parentPath: string
   ): Record<string, unknown> {
-    // Build metadata
+    // Inherit all metadata from parent, except file-specific fields
+    // These fields are specific to the standalone parent file and should not be copied
+    const excludedFields = new Set([
+      'created',
+      'updated',
+      'extractedFrom',
+      'exploded',
+      'imploded',
+      'documentVersion'
+    ]);
+
+    // Deep clone all inheritable parent metadata
+    const inheritedMetadata: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(parentMetadata)) {
+      if (!excludedFields.has(key)) {
+        // Deep clone to avoid reference issues
+        inheritedMetadata[key] = JSON.parse(JSON.stringify(value));
+      }
+    }
+
+    // Build metadata with inherited fields, then override with extracted-file-specific fields
     const metadata: Record<string, unknown> = {
+      ...inheritedMetadata,
       formatVersion: '1.1',
       documentVersion: '1.0.0',
       created: new Date().toISOString(),
       extractedFrom: parentPath
     };
-
-    // Inherit author and license from parent
-    if (parentMetadata.author) {
-      metadata.author = parentMetadata.author;
-    }
-    if (parentMetadata.license) {
-      metadata.license = parentMetadata.license;
-    }
 
     // Create codex structure
     const extractedCodex: Record<string, unknown> = { metadata };
@@ -336,14 +358,16 @@ export class CodexExploder {
     const childName = (child.name as string) || (child.title as string) || 'Untitled';
     const childId = (child.id as string) || `child_${index}`;
 
-    // Sanitize name for filename
+    // === SECURITY: Sanitize ALL user-controlled fields used in path construction ===
+    const safeType = this.sanitizeFilename(childType);
     const safeName = this.sanitizeFilename(childName);
+    const safeId = this.sanitizeFilename(childId);
 
     // Replace placeholders
     let outputStr = pattern
-      .replace(/\{type\}/g, childType)
+      .replace(/\{type\}/g, safeType)
       .replace(/\{name\}/g, safeName)
-      .replace(/\{id\}/g, childId)
+      .replace(/\{id\}/g, safeId)
       .replace(/\{index\}/g, String(index));
 
     // Ensure correct extension
@@ -357,6 +381,13 @@ export class CodexExploder {
     // Resolve relative to parent directory
     if (!path.isAbsolute(outputPath)) {
       outputPath = path.resolve(parentDir, outputPath);
+    }
+
+    // === SECURITY: Validate resolved path stays within parent directory ===
+    const normalizedOutput = path.normalize(outputPath);
+    const normalizedParent = path.normalize(parentDir);
+    if (!normalizedOutput.startsWith(normalizedParent + path.sep) && normalizedOutput !== normalizedParent) {
+      throw new Error(`Output path escapes parent directory boundary: ${outputPath}`);
     }
 
     return outputPath;
@@ -431,7 +462,7 @@ export class CodexExploder {
           for (const pair of node.items) {
             if (YAML.isScalar(pair.value) && typeof pair.value.value === 'string') {
               const str = pair.value.value;
-              if (str.includes('\n') || str.length > 80) {
+              if (str.includes('\n') || str.length > 60) {
                 pair.value.type = YAML.Scalar.BLOCK_LITERAL;
               }
             } else {

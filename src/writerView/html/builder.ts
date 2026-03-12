@@ -150,8 +150,8 @@ ${getWriterViewStyles()}
     </div>
   </div>
 
-  <!-- Images Gallery -->
-  <div class="structured-editor" id="imagesEditor">
+  <!-- Images Gallery (hidden when empty, shown via +Add or when images exist) -->
+  <div class="structured-editor${!node.hasImages ? ' images-empty-hidden' : ''}" id="imagesEditor">
     <div class="structured-header">
       <span class="structured-title overview-section-header-inline" data-field="__images__">Images</span>
       <span class="images-count">${node.images?.length || 0} images</span>

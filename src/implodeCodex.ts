@@ -43,6 +43,8 @@ export class CodexImploder {
   private deletedFiles: string[] = [];
   private deletedFolders: string[] = [];
   private errors: string[] = [];
+  /** Tracks files currently being processed to detect circular includes */
+  private visitedPaths: Set<string> = new Set();
 
   /**
    * Implode a codex file - resolve includes and merge content
@@ -56,12 +58,18 @@ export class CodexImploder {
     this.deletedFiles = [];
     this.deletedFolders = [];
     this.errors = [];
+    this.visitedPaths = new Set();
 
     try {
       // Read input file
       const inputPath = documentUri.fsPath;
       if (!fs.existsSync(inputPath)) {
         throw new Error(`Input file not found: ${inputPath}`);
+      }
+
+      // === SECURITY: Reject symlinks to prevent path escape attacks ===
+      if (fs.lstatSync(inputPath).isSymbolicLink()) {
+        throw new Error(`Symlinks not allowed: ${inputPath}`);
       }
 
       const fileContent = fs.readFileSync(inputPath, 'utf-8');
@@ -152,7 +160,7 @@ export class CodexImploder {
 
       // Delete source files if requested
       if (options.deleteSourceFiles && this.mergedFiles.length > 0) {
-        await this.deleteSourceFiles(options.deleteEmptyFolders);
+        await this.deleteSourceFiles(parentDir, options.deleteEmptyFolders);
       }
 
       return {
@@ -267,9 +275,21 @@ export class CodexImploder {
       return null;
     }
 
+    // === CIRCULAR INCLUDE DETECTION ===
+    if (this.visitedPaths.has(normalizedFull)) {
+      this.errors.push(`Circular include detected: ${includePath} (already processing ${normalizedFull})`);
+      return null;
+    }
+
     // Validate file exists
     if (!fs.existsSync(fullPath)) {
       this.errors.push(`Include file not found: ${fullPath}`);
+      return null;
+    }
+
+    // === SECURITY: Reject symlinks to prevent path escape attacks ===
+    if (fs.lstatSync(fullPath).isSymbolicLink()) {
+      this.errors.push(`Symlinks not allowed for includes: ${fullPath}`);
       return null;
     }
 
@@ -278,6 +298,9 @@ export class CodexImploder {
       this.errors.push(`Include is not a valid codex file: ${fullPath}`);
       return null;
     }
+
+    // Mark as being processed to detect circular includes
+    this.visitedPaths.add(normalizedFull);
 
     // Read and parse the file
     const content = fs.readFileSync(fullPath, 'utf-8');
@@ -336,11 +359,19 @@ export class CodexImploder {
   /**
    * Delete source files after successful merge
    */
-  private async deleteSourceFiles(deleteEmptyFolders: boolean): Promise<void> {
+  private async deleteSourceFiles(parentDir: string, deleteEmptyFolders: boolean): Promise<void> {
     const foldersToCheck = new Set<string>();
+    const normalizedParent = path.normalize(parentDir);
 
     for (const filePath of this.mergedFiles) {
       try {
+        // === SECURITY: Re-validate path is within parent directory before deletion ===
+        const normalizedPath = path.normalize(filePath);
+        if (!normalizedPath.startsWith(normalizedParent + path.sep)) {
+          this.errors.push(`Refusing to delete file outside parent scope: ${filePath}`);
+          continue;
+        }
+
         if (fs.existsSync(filePath)) {
           fs.unlinkSync(filePath);
           this.deletedFiles.push(filePath);
@@ -363,6 +394,12 @@ export class CodexImploder {
 
       for (const folder of sortedFolders) {
         try {
+          // === SECURITY: Only delete folders within parent scope ===
+          const normalizedFolder = path.normalize(folder);
+          if (!normalizedFolder.startsWith(normalizedParent + path.sep)) {
+            continue;
+          }
+
           const contents = fs.readdirSync(folder);
           if (contents.length === 0) {
             fs.rmdirSync(folder);
@@ -394,7 +431,7 @@ export class CodexImploder {
           for (const pair of node.items) {
             if (YAML.isScalar(pair.value) && typeof pair.value.value === 'string') {
               const str = pair.value.value;
-              if (str.includes('\n') || str.length > 80) {
+              if (str.includes('\n') || str.length > 60) {
                 pair.value.type = YAML.Scalar.BLOCK_LITERAL;
               }
             } else {

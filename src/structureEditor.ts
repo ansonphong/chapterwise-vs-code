@@ -930,7 +930,7 @@ export class CodexStructureEditor {
   /**
    * Update include paths in all files that reference the moved file
    */
-  private async updateIncludePaths(
+  async updateIncludePaths(
     workspaceRoot: string,
     oldPath: string,
     newPath: string
@@ -1192,20 +1192,6 @@ export class CodexStructureEditor {
   }
   
   /**
-   * @deprecated No longer needed — ordering is managed by index.codex.yaml array position.
-   * Kept as no-op for backward compatibility.
-   */
-  async autofixFolderOrder(
-    _workspaceRoot: string,
-    _folderPath: string
-  ): Promise<StructureOperationResult> {
-    return {
-      success: true,
-      message: 'No-op: ordering is now managed by index.codex.yaml array position',
-    };
-  }
-  
-  /**
    * Helper: Find a node in .index.codex.json by _computed_path
    * Used for surgical updates
    */
@@ -1254,7 +1240,9 @@ export class CodexStructureEditor {
     yamlDoc.setIn(fieldPath, '');
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    return vscode.workspace.applyEdit(edit);
+    const success = await vscode.workspace.applyEdit(edit);
+    if (success) { await doc.save(); }
+    return success;
   }
 
   /**
@@ -1272,7 +1260,9 @@ export class CodexStructureEditor {
     yamlDoc.deleteIn(fieldPath);
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    return vscode.workspace.applyEdit(edit);
+    const success = await vscode.workspace.applyEdit(edit);
+    if (success) { await doc.save(); }
+    return success;
   }
 
   /**
@@ -1292,7 +1282,9 @@ export class CodexStructureEditor {
     yamlDoc.setIn([...yamlPath, newName], value);
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    return vscode.workspace.applyEdit(edit);
+    const success = await vscode.workspace.applyEdit(edit);
+    if (success) { await doc.save(); }
+    return success;
   }
 
   /**
@@ -1304,7 +1296,9 @@ export class CodexStructureEditor {
     yamlDoc.setIn([...yamlPath, 'type'], newType);
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    return vscode.workspace.applyEdit(edit);
+    const success = await vscode.workspace.applyEdit(edit);
+    if (success) { await doc.save(); }
+    return success;
   }
 
   /**
@@ -1322,7 +1316,9 @@ export class CodexStructureEditor {
     yamlDoc.setIn(tagsPath, merged);
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    return vscode.workspace.applyEdit(edit);
+    const success = await vscode.workspace.applyEdit(edit);
+    if (success) { await doc.save(); }
+    return success;
   }
 
   /**
@@ -1340,7 +1336,9 @@ export class CodexStructureEditor {
     yamlDoc.setIn(relationsPath, relations);
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    return vscode.workspace.applyEdit(edit);
+    const success = await vscode.workspace.applyEdit(edit);
+    if (success) { await doc.save(); }
+    return success;
   }
 
   /**
@@ -1352,7 +1350,9 @@ export class CodexStructureEditor {
     yamlDoc.setIn([...yamlPath, 'emoji'], emoji);
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    return vscode.workspace.applyEdit(edit);
+    const success = await vscode.workspace.applyEdit(edit);
+    if (success) { await doc.save(); }
+    return success;
   }
 
   // ============================================================================
@@ -1401,7 +1401,9 @@ export class CodexStructureEditor {
 
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    return vscode.workspace.applyEdit(edit);
+    const success = await vscode.workspace.applyEdit(edit);
+    if (success) { await doc.save(); }
+    return success;
   }
 
   /**
@@ -1441,7 +1443,9 @@ export class CodexStructureEditor {
 
     const edit = new vscode.WorkspaceEdit();
     edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), yamlDoc.toString());
-    return vscode.workspace.applyEdit(edit);
+    const success = await vscode.workspace.applyEdit(edit);
+    if (success) { await doc.save(); }
+    return success;
   }
 
   /**

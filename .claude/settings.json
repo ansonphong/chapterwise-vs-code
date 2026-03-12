@@ -6,6 +6,7 @@
     "ralph-loop@claude-plugins-official": true,
     "stripe@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
-    "chapterwise-codex@chapterwise-plugins": true
+    "chapterwise-codex@chapterwise-plugins": true,
+    "code-review@claude-plugins-official": true
   }
 }
