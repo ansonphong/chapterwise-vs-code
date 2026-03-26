@@ -121,8 +121,8 @@ See `.claude/rules/` for convention-specific rules that load contextually:
 ## Plans
 
 Plans are centralized in the parent workspace, NOT in this repo:
-- Active plans: `../../.claude/plans/vs-code/`
-- Archives: `../../.claude/plans/vs-code/_archive/`
+- Active plans: `../../plans/vs-code/`
+- Archives: `../../plans/vs-code/_archive/`
 
 ## Post-Plan Workflow
 
@@ -130,7 +130,7 @@ After implementing any plan:
 1. Update `.claude/context/` files to reflect new reality
 2. Add dated one-liner to Recent Changes below
 3. Update parent context: `../../.claude/context/chapterwise-codex.md`
-4. Archive the plan in `../../.claude/plans/vs-code/_archive/`
+4. Archive the plan in `../../plans/vs-code/_archive/`
 5. Update `../../.claude/STATUS.md` and `../../.claude/exec-order.md`
 
 ## Recent Changes
