@@ -131,7 +131,7 @@ After implementing any plan:
 2. Add dated one-liner to Recent Changes below
 3. Update parent context: `../../.claude/context/chapterwise-codex.md`
 4. Archive the plan in `../../plans/vs-code/_archive/`
-5. Update `../../.claude/STATUS.md` and `../../.claude/exec-order.md`
+5. Update `../../.claude/STATUS.md` and `../../plans/exec-order.md`
 
 ## Recent Changes
 
