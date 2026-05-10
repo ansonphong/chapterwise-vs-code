@@ -200,13 +200,11 @@ tags:
 | Extension | Format |
 |-----------|--------|
 | `.codex.yaml` | Codex YAML (recommended) - [Full Codex Format](https://chapterwise.app/docs/codex/format/codex-format) |
-| `.codex.yml` | Codex YAML - [Full Codex Format](https://chapterwise.app/docs/codex/format/codex-format) |
 | `.codex.json` | Codex JSON - [Full Codex Format](https://chapterwise.app/docs/codex/format/codex-format) |
-| `.codex.md` | Codex Lite (frontmatter) - [Codex Lite Format](https://chapterwise.app/docs/codex/format/codex-lite) |
+| `.codex` | Codex (alias) - [Full Codex Format](https://chapterwise.app/docs/codex/format/codex-format) |
 | `.md` | Markdown (Codex Lite) - [Codex Lite Format](https://chapterwise.app/docs/codex/format/codex-lite) |
-| `.markdown` | Markdown (Codex Lite) - [Codex Lite Format](https://chapterwise.app/docs/codex/format/codex-lite) |
-| `.txt` | Plain text |
-| `.fountain` | Screenplay (plain text) |
+
+> **Other extensions** (`.codex.md`, `.codex.yml`, `.markdown`, `.txt`, `.fountain`): the native macOS app supports these as of index format v2.2, but this VS Code extension does not yet recognize them. Track progress in the [file-formats-support initiative](https://github.com/anthropics/chapterwise/tree/master/plans/app/file-formats-support).
 
 ## Compatibility
 
