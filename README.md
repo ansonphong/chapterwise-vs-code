@@ -199,9 +199,14 @@ tags:
 
 | Extension | Format |
 |-----------|--------|
-| `.codex.yaml` | YAML format (recommended) - [Full Codex Format](https://chapterwise.app/docs/codex/format/codex-format) |
-| `.codex.json` | JSON format - [Full Codex Format](https://chapterwise.app/docs/codex/format/codex-format) |
+| `.codex.yaml` | Codex YAML (recommended) - [Full Codex Format](https://chapterwise.app/docs/codex/format/codex-format) |
+| `.codex.yml` | Codex YAML - [Full Codex Format](https://chapterwise.app/docs/codex/format/codex-format) |
+| `.codex.json` | Codex JSON - [Full Codex Format](https://chapterwise.app/docs/codex/format/codex-format) |
+| `.codex.md` | Codex Lite (frontmatter) - [Codex Lite Format](https://chapterwise.app/docs/codex/format/codex-lite) |
 | `.md` | Markdown (Codex Lite) - [Codex Lite Format](https://chapterwise.app/docs/codex/format/codex-lite) |
+| `.markdown` | Markdown (Codex Lite) - [Codex Lite Format](https://chapterwise.app/docs/codex/format/codex-lite) |
+| `.txt` | Plain text |
+| `.fountain` | Screenplay (plain text) |
 
 ## Compatibility
 
